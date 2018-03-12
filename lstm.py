@@ -1,32 +1,63 @@
 import numpy as np
 import tensorflow as tf
 import tensorflow.contrib.layers as layers
+map_fn = tf.map_fn
 
 class LSTMDecoder:
     """
     Класс для создания, обучения и получения разметки от LSTM-нейросети
     """
     
-    def __init__(self,num_units,num_layers,learning_rate):
+    def __init__(self,num_units,num_layers,input_size,output_size,batch_size,learning_rate):
         """
         Конструктор, в нем задаются размеры слоев и создается клетка сети
         """
-        self.create_network(num_units,num_layers,learning_rate)
-        pass
-    
-    def train(self,data):
-        
+        self.create_network(num_units,num_layers,output_size,batch_size,learning_rate)
         pass
         
+    TINY  = 1e-6    # to avoid NaNs in logs
+    def train(self,inputs,labels,num_epochs=1000,iterations_per_epoch=100):
+        
+        #for epoch in np.arange(num_epochs):
+         #   for _ in np.arange(iterations_per_epoch):
+                
+        pass
+        
     
-    def create_network(self,num_units,num_layers,learning_rate):
+    
+    def create_network(self,num_units,num_layers,input_size,output_size,learning_rate,batch_size=100):
         self.num_units=num_units
         self.num_layers=num_layers
         self.learning_rate=learning_rate
-        cells=[]
+        self.inputs=tf.placeholder(tf.float32,(None,None,input_size)) # (time, batch, in)
+        self.outputs = tf.placeholder(tf.float32, (None, None, output_size))# (time, batch, out)
+        cells=[]#список клеток
+        dropout=tf.placeholder(tf.float32)
         for _ in range(num_layers):#Создать клетки для слоев
-            cell=tf.contrib.rnn.LSTMCell(num_units)
+            cell=tf.contrib.rnn.BasicLSTMCell(num_units,state_is_tuple=True)
+            cell=tf.contrib.rnn.DropoutWrapper(cell,ouput_keep_prob=1.0-dropout)
             cells.append(cell)
-            
-        cell=tf.contrib.rnn.MultiRNNCell(cells)
+        self.cell=tf.contrib.rnn.MultiRNNCell(cells)#Создаем клетку из нескольких
+        
+        # Given inputs (time, batch, input_size) outputs a tuple
+        #  - outputs: (time, batch, output_size)  [do not mistake with OUTPUT_SIZE]
+        #  - states:  (time, batch, hidden_size)
+        self.batch_size=batch_size
+        initial_state=cell.zero_state(batch_size,tf.float32)
+        rnn_outputs, rnn_states = tf.nn.dynamic_rnn(self.cell, self.inputs, initial_state=initial_state, time_major=True)
+        
+        # project output from rnn output size to OUTPUT_SIZE. Sometimes it is worth adding
+        # an extra layer here.
+        final_projection = lambda x: layers.fully_connected(x, num_outputs=output_size, activation_fn=tf.nn.sigmoid)
+        # apply projection to every timestep.
+        predicted_outputs = map_fn(final_projection, rnn_outputs)
+        # compute elementwise cross entropy.
+        error = -(self.outputs * tf.log(predicted_outputs + self.TINY) + (1.0 - self.outputs) * tf.log(1.0 - predicted_outputs + self.TINY))
+        error = tf.reduce_mean(error)
+        # optimize
+        self.train_fn = tf.train.AdamOptimizer(learning_rate=self.learning_rate).minimize(error)
+
+        # assuming that absolute difference between output and correct answer is 0.5
+        # or less we can round it to the correct output.
+        self.accuracy = tf.reduce_mean(tf.cast(tf.abs(self.outputs - predicted_outputs) < 0.5, tf.float32))
         pass
