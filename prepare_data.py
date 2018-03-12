@@ -81,6 +81,6 @@ class DataLoader:
                 self.load_lds(fullpath)
     pass
 
-dl=DataLoader();
+#dl=DataLoader();
 #data=dl.load_lds('Data//labeledTexts.lds')
-dl.load_labeled_texts('Data')
+#dl.load_labeled_texts('Data')
