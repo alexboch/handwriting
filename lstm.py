@@ -48,8 +48,9 @@ class LSTMDecoder:
         #this should be a tuple of tensors having shapes [batch_size, s] for s in cell.state_size
         cell_state=tf.placeholder(tf.float32, [batch_size, num_units])
         hidden_state=tf.placeholder(tf.float32,[batch_size, num_units])
-        initial_state=tf.nn.rnn_cell.LSTMStateTuple(cell_state,hidden_state)
+        #initial_state=tf.nn.rnn_cell.LSTMStateTuple(cell_state,hidden_state)
         #initial_state=np.zeros((cell.state_size.c,cell.state_size.h))
+        initial_state=self.cell.zero_state(batch_size,dtype=tf.float32)
         rnn_outputs, rnn_states = tf.nn.dynamic_rnn(self.cell, self.inputs, initial_state=initial_state)
         #inputs shape:[max_time,batch_size,depth]
         # project output from rnn output size to OUTPUT_SIZE. Sometimes it is worth adding
