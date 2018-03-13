@@ -15,17 +15,36 @@ class LSTMDecoder:
         self.create_network(num_units,num_layers,input_size,output_size,learning_rate,batch_size)
         pass
         
+    
+    
+    def label(self,data):
+        """
+        Принимает список точек и возвращает последовательность меток 
+        """
+        pass
+    
+    
     TINY  = 1e-6    # to avoid NaNs in logs
-    def train(self,inputs,labels,num_epochs=1000,iterations_per_epoch=100):
-        
-        #for epoch in np.arange(num_epochs):
-         #   for _ in np.arange(iterations_per_epoch):
-                
+    def train(self,words,num_epochs=1000):
+        """
+        words--Список слов, содержащих точки и метки
+        """
+        session=tf.Session()
+        num_batches=len(words)/self.batch_size
+        num_words=len(words)
+        for i in np.arange(num_epochs):
+            for j in np.arange(0,num_words,self.batch_size):
+                j1=j
+                j2=j1+self.batch_size if (j1+self.batch_size<num_words) else num_words-1
+                batch_words=words[j:j2]#слова для создания батча
+                #получить список точек и меток
+                #for w in batch_words:
+                    
         pass
         
     
-    
-    def create_network(self,num_units,num_layers,input_size,output_size,learning_rate,batch_size=100):
+     
+    def create_network(self,num_units,num_layers,input_size,output_size,learning_rate,batch_size=10):
         self.num_units=num_units
         self.num_layers=num_layers
         self.learning_rate=learning_rate
@@ -46,10 +65,6 @@ class LSTMDecoder:
         # If cell.state_size is an integer, this must be a Tensor of appropriate type and shape [batch_size, cell.state_size]. 
         #If cell.state_size is a tuple,
         #this should be a tuple of tensors having shapes [batch_size, s] for s in cell.state_size
-        cell_state=tf.placeholder(tf.float32, [batch_size, num_units])
-        hidden_state=tf.placeholder(tf.float32,[batch_size, num_units])
-        #initial_state=tf.nn.rnn_cell.LSTMStateTuple(cell_state,hidden_state)
-        #initial_state=np.zeros((cell.state_size.c,cell.state_size.h))
         initial_state=self.cell.zero_state(batch_size,dtype=tf.float32)
         rnn_outputs, rnn_states = tf.nn.dynamic_rnn(self.cell, self.inputs, initial_state=initial_state)
         #inputs shape:[max_time,batch_size,depth]

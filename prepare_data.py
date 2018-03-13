@@ -2,7 +2,7 @@ import tensorflow as tf
 import pandas as pd
 import numpy as np
 import os
-
+from operator import methodcaller
 
 class WordData:
     """
@@ -42,6 +42,7 @@ class DataLoader:
         #words_dict=dict.fromkeys(np.hstack(transposed_data['TextWords'].ravel()))
         for key_word in self.words_dict:
             self.words_dict[key_word]=[]
+            assert(key_word!='')
         for text in transposed_data.iterrows():
             pl=text[1][['PointLists','Labels']]
             #words_dict=dict.fromkeys(text_words)
@@ -49,9 +50,11 @@ class DataLoader:
             tmp_words_data=[WordData() for i in np.arange(num_words)]#временный список данных слов для текущего текста
             is_labeled=False
             for i in np.arange(len(pl.PointLists)):
-                print(i)
                 points_list=pl.PointLists[i]
                 labels_list=pl.Labels[i]
+                points_list=list(map(methodcaller("split",","),points_list))#разделить координаты на x и y
+                #map(lambda p: p.split(","),points_list)
+                points_list=list(map(lambda x:list(map(float, x)),points_list))#превратить координаты в числа
                 for j in np.arange(len(points_list)):
                     point=points_list[j]
                     label=labels_list[j]
@@ -62,12 +65,14 @@ class DataLoader:
                         word_index=label['Item2']#индекс слова в списке
                         tmp_words_data[word_index].point_list.append(point)#сохранить данные слова по ключу
                         tmp_words_data[word_index].labels_list.append(integer_label)
+                        assert(text[1].TextWords[word_index]!='')
                         tmp_words_data[word_index].text=text[1].TextWords[word_index]
                         
             if is_labeled:#сохранить данные, только если в тексте есть метки
                 words_data.extend(tmp_words_data)
         for wd in words_data:#пройти по всем словам и сохранить данные в словарь слов по всем текстам
             if wd.text not in self.words_dict:#если в словаре нет данных для такого слова
+                assert(wd.text!='')
                 self.words_dict[wd.text]=[]
             self.words_dict[wd.text].append(wd)#сохранить данные для этого слова               
     pass
