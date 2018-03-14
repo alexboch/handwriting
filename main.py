@@ -8,4 +8,4 @@ tf.reset_default_graph()
 dl=prepdata.DataLoader()
 dl.load_labeled_texts('Data');
 #нейросеть
-ld=lstm.LSTMDecoder(2,1,2,2,1,1)
+#ld=lstm.LSTMDecoder(2,1,2,2,1,1)

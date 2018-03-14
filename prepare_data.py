@@ -9,11 +9,11 @@ class WordData:
     Класс слова, содержащий список точек и меток
     """
     
+    def __init__(self):
+        self.point_list=[]
+        self.labels_list=[]
+        self.text=""
     
-    def __init__(self,point_list=[],labels_list=[],text=""):
-        self.point_list=point_list
-        self.labels_list=labels_list
-        self.text=text
 class DataLoader:
     
     #Словарь с точками слов и метками
@@ -22,11 +22,12 @@ class DataLoader:
         return
     
    
-    
-    def label_to_int(self,char_label):
+    @staticmethod
+    def label_to_int(char_label):
         return ord(char_label)-1072#Код буквы А=1072
     
-    def int_label_to_char(self,int_label):
+    @staticmethod
+    def int_label_to_char(int_label):
         return chr(int_label + 1072)
     
     def load_lds(self,filename):
@@ -40,22 +41,26 @@ class DataLoader:
         #Создать ключи словаря из слов всех текстов
         
         #words_dict=dict.fromkeys(np.hstack(transposed_data['TextWords'].ravel()))
-        for key_word in self.words_dict:
-            self.words_dict[key_word]=[]
-            assert(key_word!='')
-        for text in transposed_data.iterrows():
-            pl=text[1][['PointLists','Labels']]
+        
+        for text in transposed_data.iterrows():#Цикл по всем текстам текущего файла
+            pl=text[1][['PointLists','Labels']]#выбрать  списки точек и соответствующие им списки меток
             #words_dict=dict.fromkeys(text_words)
             num_words=len(text[1].TextWords)
-            tmp_words_data=[WordData() for i in np.arange(num_words)]#временный список данных слов для текущего текста
+            tmp_words_data=[]
+            for i in np.arange(num_words):
+                wd=WordData()
+                tmp_words_data.append(wd)
+            #tmp_words_data=[WordData() for i in np.arange(num_words)]#временный список данных слов для текущего текста
+            #
+                
             is_labeled=False
-            for i in np.arange(len(pl.PointLists)):
+            for i in np.arange(len(pl.PointLists)):#Цикл по всем спискам точек
                 points_list=pl.PointLists[i]
                 labels_list=pl.Labels[i]
                 points_list=list(map(methodcaller("split",","),points_list))#разделить координаты на x и y
                 #map(lambda p: p.split(","),points_list)
                 points_list=list(map(lambda x:list(map(float, x)),points_list))#превратить координаты в числа
-                for j in np.arange(len(points_list)):
+                for j in np.arange(len(points_list)):#Цикл по всем точкам списка
                     point=points_list[j]
                     label=labels_list[j]
                     if label is not None:#Если не нулевая метка
@@ -65,11 +70,12 @@ class DataLoader:
                         word_index=label['Item2']#индекс слова в списке
                         tmp_words_data[word_index].point_list.append(point)#сохранить данные слова по ключу
                         tmp_words_data[word_index].labels_list.append(integer_label)
+                        print(word_index)
                         assert(text[1].TextWords[word_index]!='')
-                        tmp_words_data[word_index].text=text[1].TextWords[word_index]
+                        tmp_words_data[word_index].text=text[1].TextWords[word_index]#Задать строку текста
                         
             if is_labeled:#сохранить данные, только если в тексте есть метки
-                words_data.extend(tmp_words_data)
+                words_data.extend(filter(lambda w:w.text!='', tmp_words_data))
         for wd in words_data:#пройти по всем словам и сохранить данные в словарь слов по всем текстам
             if wd.text not in self.words_dict:#если в словаре нет данных для такого слова
                 assert(wd.text!='')
