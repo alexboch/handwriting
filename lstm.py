@@ -35,11 +35,20 @@ class LSTMDecoder:
         for i in np.arange(num_epochs):
             for j in np.arange(0,num_words,self.batch_size):
                 j1=j
-                j2=j1+self.batch_size if (j1+self.batch_size<num_words) else num_words-1
+                j2=j1+self.batch_size
                 batch_words=words[j:j2]#слова для создания батча
+                batch_inputs=[]
+                batch_labels=[]
                 #получить список точек и меток
-                #for w in batch_words:
-                    
+                for w in batch_words:
+                    batch_inputs.append(w.point_list)
+                    batch_labels.append(w.labels_list)
+                inputs_arr=np.asarray(batch_inputs)
+                outputs_arr=np.asarray(batch_labels)
+                outputs_arr=np.expand_dims(outputs_arr,2)
+                outputs_arr=outputs_arr.astype(float)
+                session.run(self.train_fn,feed_dict={self.inputs:inputs_arr,self.outputs:outputs_arr})
+                #session.run(self.train_fn,feed_dict={self.inputs:batch_inputs, self.outputs:batch_labels})
         pass
         
     

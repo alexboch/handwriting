@@ -14,6 +14,7 @@ class WordData:
         self.labels_list=[]
         self.text=""
     
+        
 class DataLoader:
     
     #Словарь с точками слов и метками
@@ -80,6 +81,7 @@ class DataLoader:
             if wd.text not in self.words_dict:#если в словаре нет данных для такого слова
                 assert(wd.text!='')
                 self.words_dict[wd.text]=[]
+            
             self.words_dict[wd.text].append(wd)#сохранить данные для этого слова               
     pass
 
