@@ -52,26 +52,29 @@ class LSTMDecoder:
                 outputs_arr=np.asarray(batch_labels)
                 outputs_arr=np.expand_dims(outputs_arr,2)#чтобы создать из числа-метки массив из одного числа
                 outputs_arr=outputs_arr.astype(float)
-                session.run(self.train_fn,feed_dict={self.inputs:inputs_arr,self.outputs:outputs_arr})
+                session.run(self.train_fn, feed_dict={self.inputs:inputs_arr, self.targets:outputs_arr})
                 #session.run(self.train_fn,feed_dict={self.inputs:batch_inputs, self.outputs:batch_labels})
         session.close()
         pass
         
     
      
-    def create_network(self,num_units,num_layers,input_size,output_size,learning_rate,batch_size=10):
+    def create_network(self, num_units, num_layers, input_size, num_classes, learning_rate, batch_size=10):
         self.num_units=num_units
         self.num_layers=num_layers
         self.learning_rate=learning_rate
-        self.inputs=tf.placeholder(tf.float32,(None,None,input_size)) # (time, batch, in)
-        self.outputs = tf.placeholder(tf.float32, (None, None, output_size))# (time, batch, out)
+        self.inputs=tf.placeholder(tf.float32,(None,None,input_size))
+        #self.targets = tf.placeholder(tf.float32, (None, None, num_classes))#
+        # Here we use sparse_placeholder that will generate a
+        # SparseTensor required by ctc_loss op.
+
+        targets = tf.sparse_placeholder(tf.int32)
         cells=[]#список клеток
         dropout=tf.placeholder(tf.float32)
         cell=tf.contrib.rnn.LSTMCell(num_units,state_is_tuple=True)
         self.cell=tf.contrib.rnn.MultiRNNCell([cell]*num_units,state_is_tuple=True)
-        self.W=tf.Variable(tf.truncated_normal([num_units,output_size],stddev=0.1))#Начальная матрица весов
-        b=tf.Variable(tf.constant(0.,shape=[output_size]))
-        
+        self.W=tf.Variable(tf.truncated_normal([num_units, num_classes], stddev=0.1))#Начальная матрица весов
+        b=tf.Variable(tf.constant(0., shape=[num_classes]))
         # Given inputs (time, batch, input_size) outputs a tuple
         #  - outputs: (time, batch, output_size)  [do not mistake with OUTPUT_SIZE]
         #  - states:  (time, batch, hidden_size)
@@ -83,8 +86,21 @@ class LSTMDecoder:
         #rnn_outputs--Тензор размерности [batch_size,max_time,cell.output_size],max_time--кол-во точек слова,cell.output_size=2(x,y координаты)
         #rnn_state--последнее состояние
         rnn_outputs, rnn_states = tf.nn.dynamic_rnn(self.cell, self.inputs, initial_state=initial_state)
-        logits=tf.matmul(rnn_outputs,W)+b
-        
+        # Reshaping to apply the same weights over the timesteps
+        rnn_outputs = tf.reshape(rnn_outputs, [-1, num_units])
+        logits=tf.matmul(rnn_outputs,self.W)+b
+        # Reshaping back to the original shape
+        logits = tf.reshape(logits, [batch_size, -1, ])
+
+        # Time major
+        logits = tf.transpose(logits, (1, 0, 2))
+        loss=tf.nn.ctc_loss(self.targets, logits, batch_size, ctc_merge_repeated=False)
+        cost = tf.reduce_mean(loss)
+        self.train_fn = tf.train.MomentumOptimizer(learning_rate,
+                                           0.9).minimize(cost)
+
+        decoded, log_prob = tf.nn.ctc_greedy_decoder(logits, batch_size)
+
         """
         #inputs shape:[max_time,batch_size,depth]
         # project output from rnn output size to OUTPUT_SIZE. Sometimes it is worth adding
