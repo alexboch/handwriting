@@ -29,10 +29,13 @@ class LSTMDecoder:
         """
         words--Список слов, содержащих точки и метки
         """
+        init_op = tf.initialize_all_variables()
         session=tf.Session()
+        session.run(init_op)
         num_batches=len(words)/self.batch_size
         num_words=len(words)
         for i in np.arange(num_epochs):
+            print("Epoch number ",str(i))
             for j in np.arange(0,num_words,self.batch_size):
                 j1=j
                 j2=j1+self.batch_size
@@ -63,7 +66,7 @@ class LSTMDecoder:
         dropout=tf.placeholder(tf.float32)
         for _ in range(num_layers):#Создать клетки для слоев
             cell=tf.contrib.rnn.BasicLSTMCell(num_units,state_is_tuple=True)
-            cell=tf.contrib.rnn.DropoutWrapper(cell,output_keep_prob=1.0-dropout)
+            #cell=tf.contrib.rnn.DropoutWrapper(cell,output_keep_prob=1.0-dropout)
             cells.append(cell)
         self.cell=tf.contrib.rnn.MultiRNNCell(cells)#Создаем клетку из нескольких
         
