@@ -22,14 +22,26 @@ class DataLoader:
     def __init__(self):
         return
     
-   
+    NOISE_LABEL='&'#Метка для шума
+    CONNECTION_LABEL='$'#Метка для соединения
+    LAST_CODE=1105#Код буквы ё, последней в UTF-8
+    FIRST_CODE=1040#Код буквы
+
     @staticmethod
     def label_to_int(char_label):
-        return ord(char_label)-1072#Код буквы А=1072
+        if char_label==DataLoader.CONNECTION_LABEL:
+            return DataLoader.LAST_CODE-DataLoader.FIRST_CODE+1
+        if char_label==DataLoader.NOISE_LABEL:
+            return DataLoader.LAST_CODE-DataLoader.FIRST_CODE+2
+        return ord(char_label)-DataLoader.FIRST_CODE#Код буквы а=1072
     
     @staticmethod
     def int_label_to_char(int_label):
-        return chr(int_label + 1072)
+        if int_label==DataLoader.LAST_CODE+1:
+            return DataLoader.CONNECTION_LABEL
+        if int_label==DataLoader.LAST_CODE+2:
+            return DataLoader.NOISE_LABEL
+        return chr(int_label + DataLoader.FIRST_CODE)
     
     def load_lds(self,filename):
         """
