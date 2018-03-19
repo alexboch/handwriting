@@ -40,7 +40,7 @@ class LSTMDecoder:
         for i in np.arange(num_epochs):
             print("Epoch number ",str(i))
             np.random.shuffle(words)
-
+            epoch_error=0#Средняя ошибка по всем батчам в данной эпохе
             for j in np.arange(0,num_words,self.batch_size):#Цикл по всем словам, берем по batch_size слов
                 j1=j
                 j2=j1+self.batch_size
@@ -58,8 +58,12 @@ class LSTMDecoder:
                 #targets_array=np.expand_dims(targets_array, 2)#чтобы создать из числа-метки массив из одного числа
                 #targets_array=targets_array.astype(float)
                 targets_array=sparse_tuple_from(targets_array)
-                session.run(self.train_fn, feed_dict={self.inputs:inputs_arr, self.targets:targets_array,self.seq_len:seq_length})
+                s,_=session.run([self.cost,self.train_fn], feed_dict={self.inputs:inputs_arr, self.targets:targets_array,self.seq_len:seq_length})
+                epoch_error+=s
+                print("Batch cost:",s)
                 #session.run(self.train_fn,feed_dict={self.inputs:batch_inputs, self.outputs:batch_labels})
+            epoch_error /= num_words
+            print("Epoch error:",epoch_error)
         session.close()
         pass
         
@@ -107,9 +111,9 @@ class LSTMDecoder:
         # Time major
         logits = tf.transpose(logits, (1, 0, 2))
         loss=tf.nn.ctc_loss(self.targets, logits, self.seq_len, ctc_merge_repeated=False)
-        cost = tf.reduce_mean(loss)
+        self.cost = tf.reduce_mean(loss)
         self.train_fn = tf.train.MomentumOptimizer(learning_rate,
-                                           0.9).minimize(cost)
+                                           0.9).minimize(self.cost)
 
         decoded, log_prob = tf.nn.ctc_greedy_decoder(logits, self.seq_len)
 
