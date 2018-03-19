@@ -42,7 +42,12 @@ class DataLoader:
         if int_label==DataLoader.LAST_CODE+2:
             return DataLoader.NOISE_LABEL
         return chr(int_label + DataLoader.FIRST_CODE)
-    
+
+
+    def get_words_list(self):
+        wl=list(self.words_dict.values())
+        flattened_list=[item for sublist in wl for item in sublist]
+        return flattened_list
     def load_lds(self,filename):
         """
         Добавляет в словарь точки слов из файла

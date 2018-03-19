@@ -21,12 +21,15 @@ class LSTMDecoder:
     
     def label(self,data):
         """
-        Принимает список точек и возвращает последовательность меток 
+        Принимает список точек и возвращает последовательность меток
         """
-        
+        session=tf.Session()
+        session.run()
+
+        session.close()
         pass
-    
-    
+
+
     TINY  = 1e-6    # to avoid NaNs in logs
     def train(self,words,num_epochs=100):
         """
@@ -55,10 +58,10 @@ class LSTMDecoder:
                     batch_labels.append(w.labels_list)
                 inputs_arr=np.asarray(batch_inputs)
                 targets_array=np.asarray(batch_labels)
-                #targets_array=np.expand_dims(targets_array, 2)#чтобы создать из числа-метки массив из одного числа
-                #targets_array=targets_array.astype(float)
                 targets_array=sparse_tuple_from(targets_array)
-                s,_=session.run([self.cost,self.train_fn], feed_dict={self.inputs:inputs_arr, self.targets:targets_array,self.seq_len:seq_length})
+                s,loss,logits,_=session.run([self.cost,self.loss,self.logits,self.train_fn], feed_dict={self.inputs:inputs_arr, self.targets:targets_array,self.seq_len:seq_length})
+                print('batch loss:',loss)
+                print('logits:',logits)
                 epoch_error+=s
                 print("Batch cost:",s)
                 #session.run(self.train_fn,feed_dict={self.inputs:batch_inputs, self.outputs:batch_labels})
@@ -85,7 +88,7 @@ class LSTMDecoder:
         cell=tf.contrib.rnn.LSTMCell(num_units,state_is_tuple=True)
         self.cells_stack=tf.contrib.rnn.MultiRNNCell([cell] * num_units, state_is_tuple=True)
         self.W=tf.Variable(tf.truncated_normal([num_units, num_classes], stddev=0.1))#Начальная матрица весов
-        b=tf.Variable(tf.constant(0., shape=[num_classes]))
+        self.b=tf.Variable(tf.constant(0., shape=[num_classes]))
         # Given inputs (time, batch, input_size) outputs a tuple
         #  - outputs: (time, batch, output_size)  [do not mistake with OUTPUT_SIZE]
         #  - states:  (time, batch, hidden_size)
@@ -104,19 +107,17 @@ class LSTMDecoder:
         rnn_outputs, rnn_states = tf.nn.dynamic_rnn(self.cells_stack, self.inputs,self.seq_len, dtype=tf.float32)
         # Reshaping to apply the same weights over the timesteps
         rnn_outputs = tf.reshape(rnn_outputs, [-1, num_units])
-        logits=tf.matmul(rnn_outputs,self.W)+b
+        self.logits=tf.matmul(rnn_outputs,self.W)+self.b
         # Reshaping back to the original shape
-        logits = tf.reshape(logits, [self.batch_size, -1, num_classes])
+        self.logits = tf.reshape(self.logits, [self.batch_size, -1, num_classes])
 
         # Time major
-        logits = tf.transpose(logits, (1, 0, 2))
-        loss=tf.nn.ctc_loss(self.targets, logits, self.seq_len, ctc_merge_repeated=False)
-        self.cost = tf.reduce_mean(loss)
+        self.logits = tf.transpose(self.logits, (1, 0, 2))
+        self.loss=tf.nn.ctc_loss(self.targets, self.logits, self.seq_len, ctc_merge_repeated=False)
+        self.cost = tf.reduce_mean(self.loss)
         self.train_fn = tf.train.MomentumOptimizer(learning_rate,
                                            0.9).minimize(self.cost)
-
-        decoded, log_prob = tf.nn.ctc_greedy_decoder(logits, self.seq_len)
-
+        self.decoded, self.log_prob = tf.nn.ctc_greedy_decoder(self.logits, self.seq_len)
         """
         #inputs shape:[max_time,batch_size,depth]
         # project output from rnn output size to OUTPUT_SIZE. Sometimes it is worth adding
