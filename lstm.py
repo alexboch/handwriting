@@ -24,7 +24,8 @@ class LSTMDecoder:
         Принимает список точек и возвращает последовательность меток
         """
         session=tf.Session()
-        length=len(points[0])
+        session.run(tf.global_variables_initializer())
+        length=[len(points[0])]
 
         decoded,log_prob=session.run([self.decoded[0],self.log_prob], feed_dict={self.inputs:points, self.seq_len:length})
         session.close()
@@ -97,7 +98,7 @@ class LSTMDecoder:
         self.batch_size=batch_size
 
         # 1d array of size [batch_size]
-        self.seq_len = tf.placeholder(tf.int32, [None])
+        self.seq_len = tf.placeholder(tf.int32, [None],name='seq_len')
         #seq_len=np.ndarray(shape=[batch_size],dtype=int)
 
         # If cell.state_size is an integer, this must be a Tensor of appropriate type and shape [batch_size, cell.state_size].
