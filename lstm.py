@@ -68,9 +68,9 @@ class LSTMDecoder:
                 targets_array=sparse_tuple_from(targets_array)
                 s,loss,logits,_=session.run([self.cost,self.loss,self.logits,self.train_fn], feed_dict={self.inputs:inputs_arr, self.targets:targets_array,self.seq_len:seq_length})
                 print('batch loss:',loss)
-                print('logits:',logits)
+                #print('logits:',logits)
                 epoch_error+=s
-                print("Batch cost:",s)
+                #print("Batch cost:",s)
                 #session.run(self.train_fn,feed_dict={self.inputs:batch_inputs, self.outputs:batch_labels})
             epoch_error /= num_words
             print("Epoch error:",epoch_error)
@@ -96,8 +96,9 @@ class LSTMDecoder:
 
         self.targets = tf.sparse_placeholder(tf.int32)
         #dropout=tf.placeholder(tf.float32,name='dropout')
-        cell=tf.contrib.rnn.LSTMCell(self.num_units,state_is_tuple=True)
-        self.cells_stack=tf.contrib.rnn.MultiRNNCell([cell] * self.num_units, state_is_tuple=True)#TODO:Исправить конструирование клетки
+        #cell=tf.contrib.rnn.LSTMCell(self.num_units,state_is_tuple=True)
+        #self.cells_stack=tf.contrib.rnn.MultiRNNCell([cell] * self.num_units, state_is_tuple=True)
+        self.cells_stack=tf.contrib.rnn.MultiRNNCell([self.lstm_cell() for _ in range(self.num_units)],state_is_tuple=True)
         self.W=tf.Variable(tf.truncated_normal([self.num_units, self.num_classes], stddev=0.1))#Начальная матрица весов
         self.b=tf.Variable(tf.constant(0., shape=[self.num_classes]))
         # Given inputs (time, batch, input_size) outputs a tuple
