@@ -1,5 +1,6 @@
 import numpy as np
 import tensorflow as tf
+from prepare_data import DataLoader
 from utils import *
 import tensorflow.contrib.layers as layers
 map_fn = tf.map_fn
@@ -26,9 +27,13 @@ class LSTMDecoder:
         session=tf.Session()
         session.run(tf.global_variables_initializer())
         length=[len(points[0])]
-
+        points=np.asarray(points)
         decoded,log_prob=session.run([self.decoded[0],self.log_prob], feed_dict={self.inputs:points, self.seq_len:length})
+        arr_decoded=np.asarray(decoded[1])
+
         session.close()
+        str_decoded=''.join([DataLoader.int_label_to_char(x) for x in arr_decoded])
+        print('Decoded string:',str_decoded)
         return (decoded,log_prob)
 
 
@@ -61,7 +66,7 @@ class LSTMDecoder:
                 inputs_arr=np.asarray(batch_inputs)
                 targets_array=np.asarray(batch_labels)
                 targets_array=sparse_tuple_from(targets_array)
-                s,loss,logits,_,decoded=session.run([self.cost,self.loss,self.logits,self.train_fn,self.decoded], feed_dict={self.inputs:inputs_arr, self.targets:targets_array,self.seq_len:seq_length})
+                s,loss,logits,_=session.run([self.cost,self.loss,self.logits,self.train_fn], feed_dict={self.inputs:inputs_arr, self.targets:targets_array,self.seq_len:seq_length})
                 print('batch loss:',loss)
                 print('logits:',logits)
                 epoch_error+=s
@@ -71,8 +76,11 @@ class LSTMDecoder:
             print("Epoch error:",epoch_error)
         session.close()
         pass
-        
-    
+
+
+    def lstm_cell(self,):
+        cell = tf.contrib.rnn.LSTMCell(self.num_units, state_is_tuple=True)
+        return cell
      
     def create_network(self, num_units, num_layers, input_size, num_classes, learning_rate, batch_size=10):
         self.num_units=num_units
@@ -89,7 +97,7 @@ class LSTMDecoder:
         self.targets = tf.sparse_placeholder(tf.int32)
         #dropout=tf.placeholder(tf.float32,name='dropout')
         cell=tf.contrib.rnn.LSTMCell(self.num_units,state_is_tuple=True)
-        self.cells_stack=tf.contrib.rnn.MultiRNNCell([cell] * self.num_units, state_is_tuple=True)
+        self.cells_stack=tf.contrib.rnn.MultiRNNCell([cell] * self.num_units, state_is_tuple=True)#TODO:Исправить конструирование клетки
         self.W=tf.Variable(tf.truncated_normal([self.num_units, self.num_classes], stddev=0.1))#Начальная матрица весов
         self.b=tf.Variable(tf.constant(0., shape=[self.num_classes]))
         # Given inputs (time, batch, input_size) outputs a tuple
