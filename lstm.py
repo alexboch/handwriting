@@ -66,8 +66,9 @@ class LSTMDecoder:
                 inputs_arr=np.asarray(batch_inputs)
                 targets_array=np.asarray(batch_labels)
                 targets_array=sparse_tuple_from(targets_array)
-                s,loss,logits,_=session.run([self.cost,self.loss,self.logits,self.train_fn], feed_dict={self.inputs:inputs_arr, self.targets:targets_array,self.seq_len:seq_length})
+                s,loss,logits,ler,_=session.run([self.cost,self.loss,self.logits,self.ler,self.train_fn], feed_dict={self.inputs:inputs_arr, self.targets:targets_array,self.seq_len:seq_length})
                 print('batch loss:',loss)
+                print('edit distance error:',ler)
                 #print('logits:',logits)
                 epoch_error+=s
                 #print("Batch cost:",s)
@@ -130,6 +131,7 @@ class LSTMDecoder:
         self.train_fn = tf.train.MomentumOptimizer(self.learning_rate,
                                            0.9).minimize(self.cost)
         self.decoded, self.log_prob = tf.nn.ctc_greedy_decoder(self.logits, self.seq_len)
+        self.ler=tf.reduce_mean(tf.edit_distance(tf.cast(self.decoded[0],tf.int32),self.targets))
         """
         #inputs shape:[max_time,batch_size,depth]
         # project output from rnn output size to OUTPUT_SIZE. Sometimes it is worth adding
