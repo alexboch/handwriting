@@ -99,7 +99,13 @@ class LSTMDecoder:
         #dropout=tf.placeholder(tf.float32,name='dropout')
         #cell=tf.contrib.rnn.LSTMCell(self.num_units,state_is_tuple=True)
         #self.cells_stack=tf.contrib.rnn.MultiRNNCell([cell] * self.num_units, state_is_tuple=True)
-        self.cells_stack=tf.contrib.rnn.MultiRNNCell([self.lstm_cell() for _ in range(self.num_units)],state_is_tuple=True)
+
+
+        self.cells_stack=tf.contrib.rnn.MultiRNNCell([self.lstm_cell() for _ in range(self.num_layers)],state_is_tuple=True)
+
+
+        #for i in range(self.num)
+
         self.W=tf.Variable(tf.truncated_normal([self.num_units, self.num_classes], stddev=0.1))#Начальная матрица весов
         self.b=tf.Variable(tf.constant(0., shape=[self.num_classes]))
         # Given inputs (time, batch, input_size) outputs a tuple
@@ -117,7 +123,10 @@ class LSTMDecoder:
         initial_state=self.cells_stack.zero_state(self.batch_size, dtype=tf.float32)
         #rnn_outputs--Тензор размерности [batch_size,max_time,cell.output_size],max_time--кол-во точек слова,cell.output_size=2(x,y координаты)
         #rnn_state--последнее состояние
-        self.rnn_outputs, self.rnn_states = tf.nn.dynamic_rnn(self.cells_stack, self.inputs,self.seq_len, dtype=tf.float32)
+
+        #self.rnn_outputs, self.rnn_state_fw,_ = tf.contrib.rnn.stack_bidirectional_dynamic_rnn(self.cells_stack, self.inputs, self.seq_len,
+        #                                                        dtype=tf.float32)
+        self.rnn_outputs, self.rnn_state_fw = tf.nn.dynamic_rnn(self.cells_stack, self.inputs, self.seq_len, dtype=tf.float32)
         # Reshaping to apply the same weights over the timesteps
         self.rnn_outputs = tf.reshape(self.rnn_outputs, [-1, self.num_units])
         self.logits=tf.matmul(self.rnn_outputs,self.W)+self.b
