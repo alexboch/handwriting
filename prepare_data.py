@@ -3,8 +3,9 @@ import pandas as pd
 import numpy as np
 import os
 from operator import methodcaller
+from sklearn.preprocessing import normalize
 
-class WordData:
+class WordData:#TODO:Добавить координаты точек
     """
     Класс слова, содержащий список точек и меток
     """
@@ -48,6 +49,18 @@ class DataLoader:
         wl=list(self.words_dict.values())
         flattened_list=[item for sublist in wl for item in sublist]
         return flattened_list
+
+    @staticmethod
+    def get_vectors_from_points(points):
+        vectors=[]#список векторов
+        for i in np.arange(len(points)-1):
+            p1=points[i]#текущая точка
+            p2=points[i+1]#следующая точка
+            v=[p2[0]-p1[0],p2[1]-p1[1]]
+            vectors.append(v)
+        vectors=normalize(vectors)  # нормализовать векторы
+        return vectors
+
     def load_lds(self,filename):
         """
         Добавляет в словарь точки слов из файла
@@ -78,15 +91,16 @@ class DataLoader:
                 points_list=list(map(methodcaller("split",","),points_list))#разделить координаты на x и y
                 #map(lambda p: p.split(","),points_list)
                 points_list=list(map(lambda x:list(map(float, x)),points_list))#превратить координаты в числа
-                for j in np.arange(len(points_list)):#Цикл по всем точкам списка
-                    point=points_list[j]
+                vectors=DataLoader.get_vectors_from_points(points_list)
+                for j in np.arange(len(vectors)):#Цикл по всем точкам списка
+                    vector=vectors[j]
                     label=labels_list[j]
                     if label is not None:#Если не нулевая метка
                         is_labeled=True
                         char_label=label['Item1']
                         integer_label=self.label_to_int(char_label)#Букву в число
                         word_index=label['Item2']#индекс слова в списке
-                        tmp_words_data[word_index].point_list.append(point)#сохранить данные слова по ключу
+                        tmp_words_data[word_index].point_list.append(vector)#сохранить данные слова по ключу
                         tmp_words_data[word_index].labels_list.append(integer_label)
                         print(word_index)
                         assert(text[1].TextWords[word_index]!='')
