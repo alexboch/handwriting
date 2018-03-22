@@ -67,6 +67,8 @@ class DataLoader:
     @staticmethod
     def get_vectors_from_points(points):
         vectors=[]#список векторов
+        if len(points)==1:
+            points.append(points[0])#Чтобы получился вектор из одной точки
         for i in np.arange(len(points)-1):
             p1=points[i]#текущая точка
             p2=points[i+1]#следующая точка
