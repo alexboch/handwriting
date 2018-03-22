@@ -161,11 +161,11 @@ class LSTMDecoder:
 
         # Time major
         self.logits = tf.transpose(self.logits, (1, 0, 2))
-        self.loss = tf.nn.ctc_loss(self.targets, self.logits, self.seq_len,preprocess_collapse_repeated=True,ctc_merge_repeated=False)
+        self.loss = tf.nn.ctc_loss(self.targets, self.logits, self.seq_len,preprocess_collapse_repeated=False,ctc_merge_repeated=False)
         self.cost = tf.reduce_mean(self.loss)
         self.train_fn = tf.train.MomentumOptimizer(self.learning_rate,
-                                                   0.99).minimize(self.cost)
-        self.decoded, self.log_prob = tf.nn.ctc_greedy_decoder(self.logits, self.seq_len)
+                                                   0.9).minimize(self.cost)
+        self.decoded, self.log_prob = tf.nn.ctc_greedy_decoder(self.logits, self.seq_len,merge_repeated=False)
         self.cast_seq=tf.cast(self.decoded[0],tf.int32)
         self.ler = tf.reduce_mean(tf.edit_distance(self.cast_seq, self.targets))#TODO:Слить повт-ся метки для вычисления расст-я редактирования
         """
