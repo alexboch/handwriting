@@ -44,7 +44,21 @@ class DataLoader:
             return DataLoader.NOISE_LABEL
         return chr(int_label + DataLoader.FIRST_CODE)
 
-
+    @staticmethod
+    def insert_blank_labels(labels):
+        """
+        Вставляет пустую метку между повторяющимися
+        :param labels:
+        :return:
+        """
+        result_labels=[]
+        for i in np.arange(len(labels)-1):
+            curr_label=labels[i]
+            result_labels.append(curr_label)
+            next_label=labels[i+1]
+            if curr_label==next_label:#Вставить пустую метку, если метка повторяется, чтобы правильно декодировалось
+                result_labels.append(get_blank_code())
+        return result_labels
     def get_words_list(self):
         wl=list(self.words_dict.values())
         flattened_list=[item for sublist in wl for item in sublist]
@@ -112,7 +126,7 @@ class DataLoader:
             if wd.text not in self.words_dict:#если в словаре нет данных для такого слова
                 assert(wd.text!='')
                 self.words_dict[wd.text]=[]
-            
+            #wd.labels_list=DataLoader.insert_blank_labels(wd.labels_list)
             self.words_dict[wd.text].append(wd)#сохранить данные для этого слова               
     pass
 
@@ -124,6 +138,10 @@ class DataLoader:
                 fullpath=os.path.join(directory,file)
                 self.load_lds(fullpath)
     pass
+
+
+def get_blank_code():
+    return DataLoader.LAST_CODE-DataLoader.FIRST_CODE+3
 
 #dl=DataLoader();
 #data=dl.load_lds('Data//labeledTexts.lds')

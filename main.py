@@ -9,9 +9,9 @@ dl = prepdata.DataLoader()
 dl.load_labeled_texts('SmallData');
 #dl.load_labeled_texts('Data');
 # нейросеть
-#TODO:Понять, что такое "пустая метка", и нужна ли метка шума
+#TODO:Попробовать вставить пустую метку между повторяющимися символами
 num_classes=69#Строчные и заглавные буквы + соединение + шум + пустая метка
-ld = lstm.LSTMDecoder(num_units=75, num_layers=1, input_size=2, num_classes=num_classes, learning_rate=0.1, batch_size=1)
-ld.train([dl.words_dict['аб'][0]],5000)
+ld = lstm.LSTMDecoder(num_units=75, num_layers=1, num_features=2, num_classes=num_classes, learning_rate=1e-2, batch_size=1)
+ld.train([dl.words_dict['аб'][0]],150)
 #ld.train(dl.get_words_list(),1000)
 labels,probs=ld.label([dl.words_dict['аб'][0].point_list])
