@@ -5,6 +5,10 @@ import os
 from operator import methodcaller
 from sklearn.preprocessing import normalize
 
+
+
+
+
 class WordData:#TODO:Добавить координаты точек
     """
     Класс слова, содержащий список точек и меток
@@ -16,7 +20,7 @@ class WordData:#TODO:Добавить координаты точек
         self.text=""
     
         
-class DataLoader:
+class DataHelper:
     
     #Словарь с точками слов и метками
     words_dict={}
@@ -25,24 +29,24 @@ class DataLoader:
     
     NOISE_LABEL='&'#Метка для шума
     CONNECTION_LABEL='$'#Метка для соединения
-    LAST_CODE=1105#Код буквы ё, последней в UTF-8
-    FIRST_CODE=1040#Код буквы
+    LastCode=1105#Код буквы ё, последней в UTF-8
+    FirstCode=1040#Код буквы
 
     @staticmethod
     def label_to_int(char_label):
-        if char_label==DataLoader.CONNECTION_LABEL:
-            return DataLoader.LAST_CODE-DataLoader.FIRST_CODE+1
-        if char_label==DataLoader.NOISE_LABEL:
-            return DataLoader.LAST_CODE-DataLoader.FIRST_CODE+2
-        return ord(char_label)-DataLoader.FIRST_CODE#Код буквы а=1072
+        if char_label==DataHelper.CONNECTION_LABEL:
+            return DataHelper.LastCode - DataHelper.FirstCode + 1
+        if char_label==DataHelper.NOISE_LABEL:
+            return DataHelper.LastCode - DataHelper.FirstCode + 2
+        return ord(char_label) - DataHelper.FirstCode#Код буквы а=1072
     
     @staticmethod
     def int_label_to_char(int_label):
-        if int_label==DataLoader.LAST_CODE+1:
-            return DataLoader.CONNECTION_LABEL
-        if int_label==DataLoader.LAST_CODE+2:
-            return DataLoader.NOISE_LABEL
-        return chr(int_label + DataLoader.FIRST_CODE)
+        if int_label==DataHelper.LastCode+1:
+            return DataHelper.CONNECTION_LABEL
+        if int_label==DataHelper.LastCode+2:
+            return DataHelper.NOISE_LABEL
+        return chr(int_label + DataHelper.FirstCode)
 
     @staticmethod
     def insert_blank_labels(labels):
@@ -107,7 +111,7 @@ class DataLoader:
                 points_list=list(map(methodcaller("split",","),points_list))#разделить координаты на x и y
                 #map(lambda p: p.split(","),points_list)
                 points_list=list(map(lambda x:list(map(float, x)),points_list))#превратить координаты в числа
-                vectors=DataLoader.get_vectors_from_points(points_list)
+                vectors=DataHelper.get_vectors_from_points(points_list)
                 for j in np.arange(len(vectors)):#Цикл по всем точкам списка
                     vector=vectors[j]
                     label=labels_list[j]
@@ -143,7 +147,7 @@ class DataLoader:
 
 
 def get_blank_code():
-    return DataLoader.LAST_CODE-DataLoader.FIRST_CODE+3
+    return DataHelper.LastCode - DataHelper.FirstCode + 3
 
 #dl=DataLoader();
 #data=dl.load_lds('Data//labeledTexts.lds')

@@ -1,6 +1,6 @@
 import numpy as np
 import tensorflow as tf
-from prepare_data import DataLoader
+from prepare_data import DataHelper
 from utils import *
 import tensorflow.contrib.layers as layers
 
@@ -33,7 +33,7 @@ class LSTMDecoder:
         arr_decoded = np.asarray(decoded[1])
 
         session.close()
-        str_decoded = ''.join([DataLoader.int_label_to_char(x) for x in arr_decoded])
+        str_decoded = ''.join([DataHelper.int_label_to_char(x) for x in arr_decoded])
         print('Decoded string:', str_decoded)
         return (decoded, log_prob)
 
@@ -75,7 +75,7 @@ class LSTMDecoder:
                 values=np.asarray(cast_seq.values)
                 train_decoded=[]
                 for x in values:
-                    train_decoded.append(DataLoader.int_label_to_char(x))
+                    train_decoded.append(DataHelper.int_label_to_char(x))
 
                 print("Decoding:",train_decoded)
                 #target_indices=np.asarray(targets_array.indices)
@@ -165,9 +165,10 @@ class LSTMDecoder:
         self.cost = tf.reduce_mean(self.loss)
         self.train_fn = tf.train.MomentumOptimizer(self.learning_rate,
                                                    0.9).minimize(self.cost)
-        self.decoded, self.log_prob = tf.nn.ctc_greedy_decoder(self.logits, self.seq_len,merge_repeated=False)
+        #self.decoded, self.log_prob = tf.nn.ctc_greedy_decoder(self.logits, self.seq_len,merge_repeated=False)
+        self.decoded, self.log_prob = tf.nn.ctc_beam_search_decoder(self.logits, self.seq_len, merge_repeated=False)
         self.cast_seq=tf.cast(self.decoded[0],tf.int32)
-        self.ler = tf.reduce_mean(tf.edit_distance(self.cast_seq, self.targets))#TODO:Слить повт-ся метки для вычисления расст-я редактирования
+        self.ler = tf.reduce_mean(tf.edit_distance(self.cast_seq, self.targets))
         """
         #inputs shape:[max_time,batch_size,depth]
         # project output from rnn output size to OUTPUT_SIZE. Sometimes it is worth adding
