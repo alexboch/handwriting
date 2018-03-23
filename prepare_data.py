@@ -56,21 +56,6 @@ class DataHelper:
     LastCode=1105#Код буквы ё, последней в UTF-8
     FirstCode=1040#Код буквы
 
-    @staticmethod
-    def label_to_int(char_label):
-        if char_label==constants.CONNECTION_LABEL:
-            return DataHelper.LastCode - DataHelper.FirstCode + 1
-        if char_label==constants.NOISE_LABEL:
-            return DataHelper.LastCode - DataHelper.FirstCode + 2
-        return ord(char_label) - DataHelper.FirstCode#Код буквы а=1072
-    
-    @staticmethod
-    def int_label_to_char(int_label):
-        if int_label==DataHelper.LastCode+1:
-            return constants.CONNECTION_LABEL
-        if int_label==DataHelper.LastCode+2:
-            return constants.NOISE_LABEL
-        return chr(int_label + DataHelper.FirstCode)
 
     def get_words_list(self):
         wl=list(self.words_dict.values())
@@ -117,6 +102,8 @@ class DataHelper:
             for i in np.arange(len(pl.PointLists)):#Цикл по всем спискам точек
                 points_list=pl.PointLists[i]
                 labels_list=pl.Labels[i]
+                if self.labels_map_function is not None:
+                    labels_list=self.labels_map_function(labels_list)
                 points_list=list(map(methodcaller("split",","),points_list))#разделить координаты на x и y
                 #map(lambda p: p.split(","),points_list)
                 points_list=list(map(lambda x:list(map(float, x)),points_list))#превратить координаты в числа
@@ -143,8 +130,8 @@ class DataHelper:
                 assert(wd.text!='')
                 self.words_dict[wd.text]=[]
             #wd.labels_list=DataLoader.insert_blank_labels(wd.labels_list)
-            if self.labels_map_function is not None:
-                wd.labels_dict=self.labels_map_function(wd.labels_dict)
+            #if self.labels_map_function is not None:
+            #    wd.labels_dict=self.labels_map_function(wd.labels_list)
             self.words_dict[wd.text].append(wd)#сохранить данные для этого слова               
     pass
 

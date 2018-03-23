@@ -18,7 +18,7 @@ class DecoderFactory(metaclass=ABCMeta):
 
 class ConnectionsOnlyDecoderFactory(DecoderFactory):
     def __init__(self):
-        super(ConnectionsOnlyDecoderFactory,self).__init__(num_units=75,num_layers=1,num_classes=3,num_features=2,learning_rate=0.01,batch_size=1)
+        super(ConnectionsOnlyDecoderFactory,self).__init__(num_units=150,num_layers=1,num_classes=3,num_features=2,learning_rate=1e-4,batch_size=1)
 
     pass
 

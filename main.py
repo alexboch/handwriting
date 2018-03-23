@@ -9,6 +9,8 @@ all_chars=[chr(x+1040) for x in range(65)]#Все символы русског�
 all_chars.append(constants.CONNECTION_LABEL)#Метка соединения
 all_chars.append(constants.NOISE_LABEL)#Метка шума
 full_alphabet=prepdata.LabelsAlphabet(all_chars)
+chars=[constants.CONNECTION_LABEL,constants.NOISE_LABEL]
+connections_only_alphabet=prepdata.LabelsAlphabet(chars)
 def train_output_func(decoded):
     values = np.asarray(decoded.values)
     train_decoded = []
@@ -17,21 +19,46 @@ def train_output_func(decoded):
     print("Decoding:", train_decoded)
     pass
 
+def connections_only_output_func(decoded):
+    values = np.asarray(decoded.values)
+    train_decoded = []
+    for x in values:
+        train_decoded.append(connections_only_alphabet.int_label_to_char(x))
+    print("Decoding:", train_decoded)
+    pass
+
+def connections_only_mapper(labels_list):
+    """
+
+    :param labels_list:
+    :return:
+    """
+    result_list=[]
+    for label in labels_list:
+        new_label=label
+        if label is not None:
+            new_char_label=label['Item1'] if label['Item1']==constants.CONNECTION_LABEL else constants.NOISE_LABEL
+            new_label['Item1']=new_char_label
+        result_list.append(new_label)
+    return result_list
+
 tf.reset_default_graph()
 
 
 # Загрузка данных
-dh = prepdata.DataHelper(full_alphabet)
-dh.load_labeled_texts('SmallData');
-#dh.load_labeled_texts('Data');
+#dh = prepdata.DataHelper(full_alphabet)
+dh=prepdata.DataHelper(connections_only_alphabet)#Только соединения/не соединения
+dh.labels_map_function=connections_only_mapper
+#dh.load_labeled_texts('SmallData');
+dh.load_labeled_texts('Data');
 # нейросеть
 num_classes=69#Строчные и заглавные буквы + соединение + шум + пустая метка
 
-factory=FullAlphabetDecoderFactory()
+factory=ConnectionsOnlyDecoderFactory()
 ld=factory.CreateDecoder()
-ld.learning_rate=0.1
-ld.num_units=75
+#ld.learning_rate=0.1
+#ld.num_units=75
 #ld = lstm.LSTMDecoder(num_units=300, num_layers=1, num_features=2, num_classes=num_classes, learning_rate=1e-5, batch_size=1)
-ld.train([dh.words_dict['аб'][0]],10000,train_output_func)
-#ld.train(dh.get_words_list(), 10000)
+#ld.train([dh.words_dict['аб'][0]],10000,train_output_func)
+ld.train(dh.get_words_list(), 10000,connections_only_output_func)
 #labels,probs=ld.label([dl.words_dict['аб'][0].point_list])

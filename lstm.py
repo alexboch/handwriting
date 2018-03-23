@@ -63,7 +63,7 @@ class LSTMDecoder:
                 for w in batch_words:
                     batch_inputs.append(w.point_list)
                     seq_length.append(len(w.point_list))  # Присоединяем длину последовательности точек
-                    batch_labels.append(w.labels_list[:-1])
+                    batch_labels.append(w.labels_list)
                 inputs_arr = np.asarray(batch_inputs)
                 targets_array = np.asarray(batch_labels)
                 targets_array = sparse_tuple_from(targets_array)
