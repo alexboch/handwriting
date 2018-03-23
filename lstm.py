@@ -39,7 +39,7 @@ class LSTMDecoder:
 
     TINY = 1e-6  # to avoid NaNs in logs
 
-    def train(self, words, num_epochs=100):
+    def train(self, words, num_epochs=100,train_output_func=None):
         """
         words--Список слов, содержащих точки и метки
         """
@@ -72,12 +72,13 @@ class LSTMDecoder:
                                                       feed_dict={self.inputs: inputs_arr, self.targets: targets_array,
                                                                  self.seq_len: seq_length})
                 indices=np.asarray(cast_seq.indices)
-                values=np.asarray(cast_seq.values)
+                if train_output_func is not None:
+                    train_output_func(cast_seq)
+                """values=np.asarray(cast_seq.values)
                 train_decoded=[]
                 for x in values:
                     train_decoded.append(DataHelper.int_label_to_char(x))
-
-                print("Decoding:",train_decoded)
+                print("Decoding:",train_decoded)"""
                 #target_indices=np.asarray(targets_array.indices)
                 #target_values=np.asarray(targets_array.values)
                 print('batch loss:', loss)
