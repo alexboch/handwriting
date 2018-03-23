@@ -2,16 +2,23 @@ import tensorflow as tf
 import pandas as pd
 import numpy as np
 import os
+import constants
 from operator import methodcaller
 from sklearn.preprocessing import normalize
 
 
 
 class LabelsAlphabet:
+    """
+    Содержит методы преобразования между числовыми метками и буквенными
+    """
     def __init__(self,characters=None):
+        self.int_to_char_dict={}#Словарь для преобразования из числовой метки в буквенную
+        self.char_to_int_dict={}#Словарь для преобразования из буквенной метки в числовую
         for i in np.arange(len(characters)):
             self.int_to_char_dict[i]=characters[i]
             self.char_to_int_dict[characters[i]]=i
+
 
     def label_to_int(self,char_label):
         return self.char_to_int_dict[char_label]
@@ -20,6 +27,11 @@ class LabelsAlphabet:
     def int_label_to_char(self,int_label):
         return self.int_to_char_dict[int_label]
 
+    def decode_numeric_labels(self,int_labels):
+        return [self.int_label_to_char(x) for x in int_labels]
+
+    def encode_char_labels(self,char_labels):
+        return [self.label_to_int(x) for x in char_labels]
 
 class WordData:#TODO:Добавить координаты точек
     """
@@ -36,45 +48,30 @@ class DataHelper:
     
     #Словарь с точками слов и метками
     words_dict={}
-    def __init__(self):
+    def __init__(self,labels_alphabet,labels_map_function=None):
+        self.labels_alphabet=labels_alphabet
+        self.labels_map_function=labels_map_function
         return
-    
-    NOISE_LABEL='&'#Метка для шума
-    CONNECTION_LABEL='$'#Метка для соединения
+
     LastCode=1105#Код буквы ё, последней в UTF-8
     FirstCode=1040#Код буквы
 
     @staticmethod
     def label_to_int(char_label):
-        if char_label==DataHelper.CONNECTION_LABEL:
+        if char_label==constants.CONNECTION_LABEL:
             return DataHelper.LastCode - DataHelper.FirstCode + 1
-        if char_label==DataHelper.NOISE_LABEL:
+        if char_label==constants.NOISE_LABEL:
             return DataHelper.LastCode - DataHelper.FirstCode + 2
         return ord(char_label) - DataHelper.FirstCode#Код буквы а=1072
     
     @staticmethod
     def int_label_to_char(int_label):
         if int_label==DataHelper.LastCode+1:
-            return DataHelper.CONNECTION_LABEL
+            return constants.CONNECTION_LABEL
         if int_label==DataHelper.LastCode+2:
-            return DataHelper.NOISE_LABEL
+            return constants.NOISE_LABEL
         return chr(int_label + DataHelper.FirstCode)
 
-    @staticmethod
-    def insert_blank_labels(labels):
-        """
-        Вставляет пустую метку между повторяющимися
-        :param labels:
-        :return:
-        """
-        result_labels=[]
-        for i in np.arange(len(labels)-1):
-            curr_label=labels[i]
-            result_labels.append(curr_label)
-            next_label=labels[i+1]
-            if curr_label==next_label:#Вставить пустую метку, если метка повторяется, чтобы правильно декодировалось
-                result_labels.append(get_blank_code())
-        return result_labels
     def get_words_list(self):
         wl=list(self.words_dict.values())
         flattened_list=[item for sublist in wl for item in sublist]
@@ -130,7 +127,8 @@ class DataHelper:
                     if label is not None:#Если не нулевая метка
                         is_labeled=True
                         char_label=label['Item1']
-                        integer_label=self.label_to_int(char_label)#Букву в число
+                        #integer_label=self.label_to_int(char_label)#Букву в число
+                        integer_label=self.labels_alphabet.label_to_int(char_label)
                         word_index=label['Item2']#индекс слова в списке
                         tmp_words_data[word_index].point_list.append(vector)#сохранить данные слова по ключу
                         tmp_words_data[word_index].labels_list.append(integer_label)
@@ -141,10 +139,12 @@ class DataHelper:
             if is_labeled:#сохранить данные, только если в тексте есть метки
                 words_data.extend(filter(lambda w:w.text!='', tmp_words_data))
         for wd in words_data:#пройти по всем словам и сохранить данные в словарь слов по всем текстам
-            if wd.text not in self.words_dict:#если в словаре нет данных для такого слова
+            if wd.text not in self.words_dict:#если в словаре нет данных для такого словаште
                 assert(wd.text!='')
                 self.words_dict[wd.text]=[]
             #wd.labels_list=DataLoader.insert_blank_labels(wd.labels_list)
+            if self.labels_map_function is not None:
+                wd.labels_dict=self.labels_map_function(wd.labels_dict)
             self.words_dict[wd.text].append(wd)#сохранить данные для этого слова               
     pass
 
@@ -156,10 +156,6 @@ class DataHelper:
                 fullpath=os.path.join(directory,file)
                 self.load_lds(fullpath)
     pass
-
-
-def get_blank_code():
-    return DataHelper.LastCode - DataHelper.FirstCode + 3
 
 #dl=DataLoader();
 #data=dl.load_lds('Data//labeledTexts.lds')

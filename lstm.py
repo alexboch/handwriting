@@ -33,7 +33,7 @@ class LSTMDecoder:
         arr_decoded = np.asarray(decoded[1])
 
         session.close()
-        str_decoded = ''.join([DataHelper.int_label_to_char(x) for x in arr_decoded])
+        str_decoded = [DataHelper.int_label_to_char(x) for x in arr_decoded]
         print('Decoded string:', str_decoded)
         return (decoded, log_prob)
 
