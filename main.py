@@ -11,6 +11,7 @@ dh = prepdata.DataHelper()
 dh.load_labeled_texts('Data');
 # нейросеть
 num_classes=69#Строчные и заглавные буквы + соединение + шум + пустая метка
+all_chars=[chr(x+1040) for x in range(65)]
 factory=FullAlphabetDecoderFactory()
 ld=factory.CreateDecoder()
 #ld = lstm.LSTMDecoder(num_units=300, num_layers=1, num_features=2, num_classes=num_classes, learning_rate=1e-5, batch_size=1)

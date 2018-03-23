@@ -7,6 +7,18 @@ from sklearn.preprocessing import normalize
 
 
 
+class LabelsAlphabet:
+    def __init__(self,characters=None):
+        for i in np.arange(len(characters)):
+            self.int_to_char_dict[i]=characters[i]
+            self.char_to_int_dict[characters[i]]=i
+
+    def label_to_int(self,char_label):
+        return self.char_to_int_dict[char_label]
+
+
+    def int_label_to_char(self,int_label):
+        return self.int_to_char_dict[int_label]
 
 
 class WordData:#TODO:Добавить координаты точек
