@@ -27,6 +27,29 @@ def connections_only_output_func(decoded):
     print("Decoding:", train_decoded)
     pass
 
+def make_label(symbol,index):
+    return {constants.CHAR_KEY:symbol,constants.INDEX_KEY:index}
+
+def framewise_mapper(labels_list):
+    """
+    Ставит метку границы там, где меняется символ, для остальных меток--'не-граница'
+    :param labels_list:
+    :return:
+    """
+    result_list=[]
+    labels_count=len(labels_list)
+
+    if labels_count>0:
+        for i in np.arange(1,labels_count):
+            current_label = labels_list[i]
+            prev_label=labels_list[i-1]
+            if prev_label[constants.CHAR_KEY]==current_label[constants.CHAR_KEY]:#Если не граница
+                new_label=make_label(constants.NOISE_LABEL,prev_label[constants.INDEX_KEY])
+            else:
+                new_label=make_label(constants.CONNECTION_LABEL,prev_label[constants.INDEX_KEY])
+            result_list.append(new_label)
+    return result_list
+
 def connections_only_mapper(labels_list):
     """
 
@@ -48,7 +71,8 @@ tf.reset_default_graph()
 # Загрузка данных
 #dh = prepdata.DataHelper(full_alphabet)
 dh=prepdata.DataHelper(connections_only_alphabet)#Только соединения/не соединения
-dh.labels_map_function=connections_only_mapper
+#dh.labels_map_function=connections_only_mapper
+dh.labels_map_function=framewise_mapper
 #dh.load_labeled_texts('SmallData');
 dh.load_labeled_texts('Data');
 # нейросеть

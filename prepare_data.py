@@ -75,6 +75,16 @@ class DataHelper:
         vectors=normalize(vectors)  # нормализовать векторы
         return vectors
 
+    @staticmethod
+    def filter_nans(points,labels):
+        result_labels=[]
+        result_points=[]
+        for i in np.arange(len(labels)):
+            if labels[i]!=None:
+                result_labels.append(labels[i])
+                result_points.append(points[i])
+        return result_points,result_labels
+
     def load_lds(self,filename):
         """
         Добавляет в словарь точки слов из файла
@@ -88,7 +98,7 @@ class DataHelper:
         #words_dict=dict.fromkeys(np.hstack(transposed_data['TextWords'].ravel()))
         
         for text in transposed_data.iterrows():#Цикл по всем текстам текущего файла
-            pl=text[1][['PointLists','Labels']]#выбрать  списки точек и соответствующие им списки меток
+            pl=text[1][['PointLists','Labels']].dropna()#выбрать  списки точек и соответствующие им списки меток
             #words_dict=dict.fromkeys(text_words)
             num_words=len(text[1].TextWords)
             tmp_words_data=[]
@@ -97,31 +107,33 @@ class DataHelper:
                 tmp_words_data.append(wd)
             #tmp_words_data=[WordData() for i in np.arange(num_words)]#временный список данных слов для текущего текста
             #
-                
+
             is_labeled=False
             for i in np.arange(len(pl.PointLists)):#Цикл по всем спискам точек
-                points_list=pl.PointLists[i]
-                labels_list=pl.Labels[i]
-                if self.labels_map_function is not None:
-                    labels_list=self.labels_map_function(labels_list)
-                points_list=list(map(methodcaller("split",","),points_list))#разделить координаты на x и y
-                #map(lambda p: p.split(","),points_list)
-                points_list=list(map(lambda x:list(map(float, x)),points_list))#превратить координаты в числа
-                vectors=DataHelper.get_vectors_from_points(points_list)
-                for j in np.arange(len(vectors)):#Цикл по всем точкам списка
-                    vector=vectors[j]
-                    label=labels_list[j]
-                    if label is not None:#Если не нулевая метка
-                        is_labeled=True
-                        char_label=label['Item1']
-                        #integer_label=self.label_to_int(char_label)#Букву в число
-                        integer_label=self.labels_alphabet.label_to_int(char_label)
-                        word_index=label['Item2']#индекс слова в списке
-                        tmp_words_data[word_index].point_list.append(vector)#сохранить данные слова по ключу
-                        tmp_words_data[word_index].labels_list.append(integer_label)
-                        print(word_index)
-                        assert(text[1].TextWords[word_index]!='')
-                        tmp_words_data[word_index].text=text[1].TextWords[word_index]#Задать строку текста
+                #points_list=pl.PointLists[i]
+                #labels_list=pl.Labels[i]
+                points_list,labels_list=DataHelper.filter_nans(pl.PointLists[i],pl.Labels[i])
+                if len(points_list)>0:#Если есть хоть одна метка
+                    if self.labels_map_function is not None:
+                        labels_list=self.labels_map_function(labels_list)
+                    points_list=list(map(methodcaller("split",","),points_list))#разделить координаты на x и y
+                    #map(lambda p: p.split(","),points_list)
+                    points_list=list(map(lambda x:list(map(float, x)),points_list))#превратить координаты в числа
+                    vectors=DataHelper.get_vectors_from_points(points_list)
+                    for j in np.arange(len(vectors)):#Цикл по всем точкам списка
+                        vector=vectors[j]
+                        label=labels_list[j]
+                        if label is not None:#Если не нулевая метка
+                            is_labeled=True
+                            char_label=label['Item1']
+                            #integer_label=self.label_to_int(char_label)#Букву в число
+                            integer_label=self.labels_alphabet.label_to_int(char_label)
+                            word_index=label['Item2']#индекс слова в списке
+                            tmp_words_data[word_index].point_list.append(vector)#сохранить данные слова по ключу
+                            tmp_words_data[word_index].labels_list.append(integer_label)
+                            print(word_index)
+                            assert(text[1].TextWords[word_index]!='')
+                            tmp_words_data[word_index].text=text[1].TextWords[word_index]#Задать строку текста
                         
             if is_labeled:#сохранить данные, только если в тексте есть метки
                 words_data.extend(filter(lambda w:w.text!='', tmp_words_data))
