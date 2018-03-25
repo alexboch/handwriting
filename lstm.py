@@ -20,12 +20,15 @@ class LSTMDecoder:
                             num_classes, learning_rate, batch_size)
         pass
 
-    def label(self, points):
+    def label(self, points,path_to_model):
         """
         Принимает список точек и возвращает последовательность меток
         """
+        saver=tf.train.Saver()
+
         session = tf.Session()
-        session.run(tf.global_variables_initializer())
+        saver.restore(session,path_to_model)#Загрузить натренированную модель
+        #session.run(tf.global_variables_initializer())
         length = [len(points[0])]
         points = np.asarray(points)
         decoded, log_prob = session.run([self.decoded[0], self.log_prob],
@@ -33,17 +36,18 @@ class LSTMDecoder:
         arr_decoded = np.asarray(decoded[1])
 
         session.close()
-        str_decoded = [DataHelper.int_label_to_char(x) for x in arr_decoded]
-        print('Decoded string:', str_decoded)
-        return (decoded, log_prob)
+        #str_decoded = [(x) for x in arr_decoded]
+        #print('Decoded string:', str_decoded)
+        return (arr_decoded, log_prob)
 
     TINY = 1e-6  # to avoid NaNs in logs
 
-    def train(self, words, num_epochs=100,train_output_func=None):
+    def train(self, words, num_epochs=100,train_output_func=None,model_name="model.ckpt"):
         """
         words--Список слов, содержащих точки и метки
         """
         # init_op = tf.initialize_all_variables()
+        saver=tf.train.Saver()
         session = tf.Session()
         session.run(tf.global_variables_initializer())
         num_batches = len(words) / self.batch_size
@@ -89,7 +93,9 @@ class LSTMDecoder:
                 # session.run(self.train_fn,feed_dict={self.inputs:batch_inputs, self.outputs:batch_labels})
             epoch_error /= num_words
             print("Epoch error:", epoch_error)
+        saver.save(session,"Models/"+model_name)
         session.close()
+
         pass
 
     def lstm_cell(self):
@@ -121,9 +127,6 @@ class LSTMDecoder:
         # SparseTensor required by ctc_loss op.
 
         self.targets = tf.sparse_placeholder(tf.int32)
-        # dropout=tf.placeholder(tf.float32,name='dropout')
-        # cell=tf.contrib.rnn.LSTMCell(self.num_units,state_is_tuple=True)
-        # self.cells_stack=tf.contrib.rnn.MultiRNNCell([cell] * self.num_units, state_is_tuple=True)
 
         self.cells_stack = tf.contrib.rnn.MultiRNNCell([self.lstm_cell() for _ in range(self.num_layers)],
                                                        state_is_tuple=True)
@@ -140,20 +143,15 @@ class LSTMDecoder:
 
         # 1d array of size [batch_size]
         self.seq_len = tf.placeholder(tf.int32, [None], name='seq_len')
-        # seq_len=np.ndarray(shape=[batch_size],dtype=int)
 
-        # If cell.state_size is an integer, this must be a Tensor of appropriate type and shape [batch_size, cell.state_size].
-        # If cell.state_size is a tuple,
-        # this should be a tuple of tensors having shapes [batch_size, s] for s in cell.state_size
-        initial_state = self.cells_stack.zero_state(self.batch_size, dtype=tf.float32)
         # rnn_outputs--Тензор размерности [batch_size,max_time,cell.output_size],max_time--кол-во точек слова,cell.output_size=2(x,y координаты)
         # rnn_state--последнее состояние
 
         # self.rnn_outputs, self.rnn_state_fw,_ = tf.contrib.rnn.stack_bidirectional_dynamic_rnn(self.cells_stack, self.inputs, self.seq_len,
         #                                                        dtype=tf.float32)
-        #self.rnn_outputs, self.rnn_state_fw = tf.nn.dynamic_rnn(self.cells_stack, self.inputs, self.seq_len,
-        #                                                        dtype=tf.float32)
-        self.rnn_outputs,self.output_state_fw,self.output_state_bw=self.create_multi_bilstm(self.num_layers,self.inputs)
+        self.rnn_outputs, self.rnn_state_fw = tf.nn.dynamic_rnn(self.cells_stack, self.inputs, self.seq_len,
+                                                                dtype=tf.float32)
+        #self.rnn_outputs,self.output_state_fw,self.output_state_bw=self.create_multi_bilstm(self.num_layers,self.inputs)
         # Reshaping to apply the same weights over the timesteps
         self.rnn_outputs = tf.reshape(self.rnn_outputs, [-1, self.num_units])
         self.logits = tf.matmul(self.rnn_outputs, self.W) + self.b
@@ -166,8 +164,7 @@ class LSTMDecoder:
         self.cost = tf.reduce_mean(self.loss)
         self.train_fn = tf.train.MomentumOptimizer(self.learning_rate,
                                                    0.9).minimize(self.cost)
-        #self.decoded, self.log_prob = tf.nn.ctc_greedy_decoder(self.logits, self.seq_len,merge_repeated=False)
-        self.decoded, self.log_prob = tf.nn.ctc_beam_search_decoder(self.logits, self.seq_len, merge_repeated=False)
+        self.decoded, self.log_prob = tf.nn.ctc_greedy_decoder(self.logits, self.seq_len,merge_repeated=False)
         self.cast_seq=tf.cast(self.decoded[0],tf.int32)
         self.ler = tf.reduce_mean(tf.edit_distance(self.cast_seq, self.targets))
         """

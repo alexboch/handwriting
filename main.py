@@ -73,8 +73,8 @@ tf.reset_default_graph()
 dh=prepdata.DataHelper(connections_only_alphabet)#Только соединения/не соединения
 #dh.labels_map_function=connections_only_mapper
 dh.labels_map_function=framewise_mapper
-#dh.load_labeled_texts('SmallData');
-dh.load_labeled_texts('Data');
+dh.load_labeled_texts('SmallData');
+#dh.load_labeled_texts('Data');
 # нейросеть
 num_classes=69#Строчные и заглавные буквы + соединение + шум + пустая метка
 
@@ -84,5 +84,7 @@ ld=factory.CreateDecoder()
 #ld.num_units=75
 #ld = lstm.LSTMDecoder(num_units=300, num_layers=1, num_features=2, num_classes=num_classes, learning_rate=1e-5, batch_size=1)
 #ld.train([dh.words_dict['аб'][0]],10000,train_output_func)
-ld.train(dh.get_words_list(), 10000,connections_only_output_func)
-#labels,probs=ld.label([dl.words_dict['аб'][0].point_list])
+ld.train(dh.get_words_list(), 50,connections_only_output_func)
+labels,probs=ld.label([dh.words_dict['аб'][0].point_list],"Models/model.ckpt")
+char_labels=connections_only_alphabet.decode_numeric_labels(labels)
+print("Labels:",char_labels)
