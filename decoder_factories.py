@@ -18,11 +18,11 @@ class DecoderFactory(metaclass=ABCMeta):
 
 class ConnectionsOnlyDecoderFactory(DecoderFactory):
     def __init__(self):
-        super(ConnectionsOnlyDecoderFactory,self).__init__(num_units=150,num_layers=1,num_classes=3,num_features=2,learning_rate=1e-4,batch_size=1)
+        super(ConnectionsOnlyDecoderFactory,self).__init__(num_units=150,num_layers=1,num_classes=3,num_features=2,learning_rate=1e-8,batch_size=1)
 
     pass
 
 class FullAlphabetDecoderFactory(DecoderFactory):
     def __init__(self):
-        super(FullAlphabetDecoderFactory,self).__init__(num_units = 300, num_layers = 1, num_features = 2, num_classes = 69, learning_rate = 1e-5, batch_size = 1)
+        super(FullAlphabetDecoderFactory,self).__init__(num_units = 20, num_layers = 1, num_features = 2, num_classes = 69, learning_rate = 1e-2, batch_size = 1)
     pass
