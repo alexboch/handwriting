@@ -9,13 +9,36 @@ class TrainConfig(Enum):
     LETTERS_MERGED=3#Метки букв, одинаковые буквы сливаются(распознавание слов без сегментации)
     CONNECTIONS=4
 
+class CellType(Enum):
+    LSTM=1
+    GRU=2
+    BIDIR_LSTM=3
+
+class NetworkConfig:
+    def __init__(self,num_epochs,num_units,num_layers,num_features,learning_rate,batch_size=1):
+        self.num_epochs=num_epochs
+        self.num_units=num_units
+        self.num_layers=num_layers
+        self.num_features=num_features
+        self.learning_rate=learning_rate
+        self.batch_size=batch_size
+
+def get_network_config(train_config):
+    if train_config==TrainConfig.BORDERS:
+        return NetworkConfig(1000,250,1,2,1e-5)
+    else:
+        if train_config==TrainConfig.LETTERS_MERGED:
+            return NetworkConfig(2000,400,1,2,1e-6)
+        else:
+            if train_config==TrainConfig.LETTERS:
+                return NetworkConfig(10000,500,1,2,1e-8)
+
 def make_label(symbol,index):
     return {constants.CHAR_KEY:symbol,constants.INDEX_KEY:index}
 
 
 def connections_only_mapper(labels_list):
     """
-
     :param labels_list:
     :return:
     """

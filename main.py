@@ -18,7 +18,7 @@ def train_output_func(decoded):
         train_decoded.append(full_alphabet.int_label_to_char(x))
     print("Decoding:", train_decoded)
     pass
-
+#TODO:Переместить вывод в класс Alphabet
 def connections_only_output_func(decoded):
     values = np.asarray(decoded.values)
     train_decoded = []
