@@ -112,7 +112,9 @@ def get_alphabet(train_config):
         chars=[constants.CONNECTION_LABEL,constants.NOISE_LABEL]
     else:
         if train_config is TrainConfig.LETTERS or train_config is TrainConfig.LETTERS_MERGED:
-            chars=[chr(x+1040) for x in range(65)]
+            chars=[chr(x+1040) for x in range(65)]#Русский алфавит в UTF-8
+            chars.append(constants.CONNECTION_LABEL)
+            chars.append(constants.NOISE_LABEL)
         else:
             chars = [constants.CONNECTION_LABEL, constants.NOISE_LABEL]
     return prepdata.LabelsAlphabet(chars)
