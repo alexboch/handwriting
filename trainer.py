@@ -21,9 +21,7 @@ class Trainer:
 
     def train_network(self,data):
         self.network.train(data,self.num_epochs,self.output_training,self.model_name)
-
         pass
-
 
 
     def run_training(self):

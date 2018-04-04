@@ -93,7 +93,6 @@ class LSTMDecoder:
             print("Epoch error:", epoch_error)
         saver.save(session,"Models/"+model_name)
         session.close()
-
         pass
 
     def lstm_cell(self):

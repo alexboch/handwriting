@@ -55,6 +55,8 @@ def get_model_name(train_config):
 def make_label(symbol,index):
     return {constants.CHAR_KEY:symbol,constants.INDEX_KEY:index}
 
+def get_data_directory(train_config):
+    return "Data"
 
 def connections_only_mapper(labels_list):
     """
