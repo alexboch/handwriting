@@ -4,17 +4,13 @@ import trainer as tr
 import configurator as conf
 from lstm import *
 
-class TrainConfig(Enum):
-    BORDERS=1#Границы букв, метка для каждого входного вектора
-    LETTERS=2#Метка буквы для каждого входного вектора
-    LETTERS_MERGED=3#Метки букв, одинаковые буквы сливаются(распознавание слов без сегментации)
+
 
 
 class TrainerBuilder:
     """
     Помогает создать объект для загрузки данных и тренировки, используя заданную конфигурацию
     """
-
 
     def create_alphabet_from_chars(self, characters):
         alphabet=pd.LabelsAlphabet(characters)
@@ -43,9 +39,10 @@ class TrainerBuilder:
     def trainer(self):
         return self._trainer
 
-    @property
+    @trainer.setter
     def trainer(self,value):
         self._trainer=value
+
 
 
     @property

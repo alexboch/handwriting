@@ -53,6 +53,8 @@ def get_network_config(train_config):
         else:
             if train_config==TrainConfig.LETTERS:
                 return NetworkConfig(500,1,2,1e-8)
+            else:
+                return NetworkConfig(500, 1, 2, 1e-8)
 
 def get_model_name(train_config):
     return train_config.name+".ckpt"
@@ -106,11 +108,13 @@ def framewise_mapper(labels_list):
 
 def get_alphabet(train_config):
 
-    if train_config==TrainConfig.BORDERS:
+    if train_config is TrainConfig.BORDERS or train_config is TrainConfig.CONNECTIONS:
         chars=[constants.CONNECTION_LABEL,constants.NOISE_LABEL]
     else:
-        if train_config==TrainConfig.LETTERS or train_config==TrainConfig.LETTERS_MERGED:
+        if train_config is TrainConfig.LETTERS or train_config is TrainConfig.LETTERS_MERGED:
             chars=[chr(x+1040) for x in range(65)]
+        else:
+            chars = [constants.CONNECTION_LABEL, constants.NOISE_LABEL]
     return prepdata.LabelsAlphabet(chars)
 
 def get_labels_mapper(train_config):
@@ -119,4 +123,5 @@ def get_labels_mapper(train_config):
     else:
         if train_config==TrainConfig.CONNECTIONS:
             return connections_only_mapper
-
+        else:
+            return None

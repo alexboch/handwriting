@@ -164,26 +164,4 @@ class LSTMDecoder:
         self.decoded, self.log_prob = tf.nn.ctc_greedy_decoder(self.logits, self.seq_len,merge_repeated=True)
         self.cast_seq=tf.cast(self.decoded[0],tf.int32)
         self.ler = tf.reduce_mean(tf.edit_distance(self.cast_seq, self.targets))
-        """
-        #inputs shape:[max_time,batch_size,depth]
-        # project output from rnn output size to OUTPUT_SIZE. Sometimes it is worth adding
-        # an extra layer here.
-        #layers_fully_connected--Добавляет полносвязный слой
-        final_projection = lambda x: layers.fully_connected(x, num_outputs=output_size, activation_fn=tf.nn.sigmoid)
-        # apply projection to every timestep.
-        predicted_outputs = map_fn(final_projection, rnn_outputs)
-        
-        
-        
-        # compute elementwise cross entropy.
-        error = -(self.outputs * tf.log(predicted_outputs + self.TINY) + (1.0 - self.outputs) * tf.log(1.0 - predicted_outputs + self.TINY))
-        error = tf.reduce_mean(error)
-        
-        # optimize
-        self.train_fn = tf.train.AdamOptimizer(learning_rate=self.learning_rate).minimize(error)
-        #self.label_fn = 
-        # assuming that absolute difference between output and correct answer is 0.5
-        # or less we can round it to the correct output.
-        self.accuracy = tf.reduce_mean(tf.cast(tf.abs(self.outputs - predicted_outputs) < 0.5, tf.float32))
-        """
         pass
