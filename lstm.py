@@ -9,7 +9,7 @@ map_fn = tf.map_fn
 
 class LSTMDecoder:
     """
-    Класс для создания, обучения и получения разметки от LSTM-нейросети
+    Класс для создания, обучения и получения разметки от LSTM-нейросети TODO:Сделать другие варианты клеток, кроме LSTM
     """
 
     def __init__(self, num_units, num_layers, num_features, num_classes, learning_rate, batch_size,alphabet):
@@ -78,7 +78,7 @@ class LSTMDecoder:
                                                                  self.seq_len: seq_length})
                 indices=np.asarray(cast_seq.indices)
                 if output_training:
-                    target_values = np.asarray(targets_array.values)
+                    target_values = np.asarray(cast_seq.values)
                     char_decoded=self.alphabet.decode_numeric_labels(target_values)
                     print("Decoded chars:",char_decoded)
                 #target_indices=np.asarray(targets_array.indices)

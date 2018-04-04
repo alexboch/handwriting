@@ -11,10 +11,10 @@ class TrainConfig(Enum):
 
 
 class TrainerBuilder:
+    """
+    Помогает создать объект для загрузки данных и тренировки, используя заданную конфигурацию
+    """
 
-    @staticmethod
-    def get_symbols(train_config):
-        pass
 
     def create_alphabet_from_chars(self, characters):
         alphabet=pd.LabelsAlphabet(characters)
@@ -55,7 +55,3 @@ class TrainerBuilder:
     @load_dir.setter
     def load_dir(self,value):
         self._trainer.data_directory=value
-
-
-    def get_trainer(self):
-        return self._trainer

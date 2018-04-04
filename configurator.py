@@ -2,6 +2,11 @@ from enum import Enum
 import prepare_data as prepdata
 import numpy as np
 import constants
+import tensorflow as tf
+
+"""
+В этом модуле задается соответствие между параметрами и конфигурациями
+"""
 
 class TrainConfig(Enum):
     BORDERS=1#Границы букв, метка для каждого входного вектора
@@ -57,6 +62,13 @@ def make_label(symbol,index):
 
 def get_data_directory(train_config):
     return "Data"
+
+def lstm_cell_factory(num_units):
+    cell=tf.contrib.rnn.LSTMCell(num_units,state_is_tuple=True)
+
+def get_cell_factory(train_config):
+    """Функция, создающая клетку нейронки"""
+    return
 
 def connections_only_mapper(labels_list):
     """
