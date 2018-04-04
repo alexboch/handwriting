@@ -33,6 +33,9 @@ class LabelsAlphabet:
     def encode_char_labels(self,char_labels):
         return [self.label_to_int(x) for x in char_labels]
 
+    def get_length(self):
+        return len(self.char_to_int_dict)
+
 class WordData:#TODO:Добавить координаты точек
     """
     Класс слова, содержащий список точек и меток

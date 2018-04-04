@@ -12,12 +12,13 @@ class LSTMDecoder:
     Класс для создания, обучения и получения разметки от LSTM-нейросети
     """
 
-    def __init__(self, num_units, num_layers, num_features, num_classes, learning_rate, batch_size):
+    def __init__(self, num_units, num_layers, num_features, num_classes, learning_rate, batch_size,alphabet):
         """
         Конструктор, в нем задаются размеры слоев и создается клетка сети
         """
         self.create_network(num_units, num_layers, num_features,
                             num_classes, learning_rate, batch_size)
+        self.alphabet=alphabet
         pass
 
     def label(self, points,path_to_model):
@@ -42,7 +43,7 @@ class LSTMDecoder:
 
     TINY = 1e-6  # to avoid NaNs in logs
 
-    def train(self, words, num_epochs=100,train_output_func=None,model_name="model.ckpt"):
+    def train(self, words, num_epochs=100,output_training=False,model_name="model.ckpt"):
         """
         words--Список слов, содержащих точки и метки
         """
@@ -76,15 +77,12 @@ class LSTMDecoder:
                                                       feed_dict={self.inputs: inputs_arr, self.targets: targets_array,
                                                                  self.seq_len: seq_length})
                 indices=np.asarray(cast_seq.indices)
-                if train_output_func is not None:
-                    train_output_func(cast_seq)
-                """values=np.asarray(cast_seq.values)
-                train_decoded=[]
-                for x in values:
-                    train_decoded.append(DataHelper.int_label_to_char(x))
-                print("Decoding:",train_decoded)"""
+                if output_training:
+                    target_values = np.asarray(targets_array.values)
+                    char_decoded=self.alphabet.decode_numeric_labels(target_values)
+                    print("Decoded chars:",char_decoded)
                 #target_indices=np.asarray(targets_array.indices)
-                #target_values=np.asarray(targets_array.values)
+                #
                 print('batch loss:', loss)
                 print('edit distance error:', ler)
                 # print('logits:',logits)
@@ -140,10 +138,8 @@ class LSTMDecoder:
         #  - outputs: (time, batch, output_size)  [do not mistake with OUTPUT_SIZE]
         #  - states:  (time, batch, hidden_size)
         self.batch_size = batch_size
-
         # 1d array of size [batch_size]
         self.seq_len = tf.placeholder(tf.int32, [None], name='seq_len')
-
         # rnn_outputs--Тензор размерности [batch_size,max_time,cell.output_size],max_time--кол-во точек слова,cell.output_size=2(x,y координаты)
         # rnn_state--последнее состояние
 

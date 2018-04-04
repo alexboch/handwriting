@@ -7,18 +7,21 @@ class Trainer:
     """
     Запускает процесс загрузки данных и тренировки нейросети
     """
-    def __init__(self,network,num_epochs,model_name):
+    def __init__(self,network,data_loader,num_epochs,model_name,data_directory,output_training=False):
         self.network=network
         self.num_epochs=num_epochs
         self.model_name=model_name
-        
+        self.data_directory=data_directory
+        self.data_loader=data_loader
+        self.output_training=output_training
         pass
 
     def load_data(self):
-        pass
+        return self.data_loader.load_labeled_texts(self.data_directory)
 
     def train_network(self,data):
-        self.network.train(data,)
+        self.network.train(data,self.num_epochs,self.output_training,self.model_name)
+
         pass
 
 

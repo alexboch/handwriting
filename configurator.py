@@ -15,23 +15,42 @@ class CellType(Enum):
     BIDIR_LSTM=3
 
 class NetworkConfig:
-    def __init__(self,num_epochs,num_units,num_layers,num_features,learning_rate,batch_size=1):
-        self.num_epochs=num_epochs
+    def __init__(self,num_units,num_layers,num_features,learning_rate,batch_size=1):
         self.num_units=num_units
         self.num_layers=num_layers
         self.num_features=num_features
         self.learning_rate=learning_rate
         self.batch_size=batch_size
 
-def get_network_config(train_config):
+def get_num_epochs(train_config):
+    """
+    Возвращает кол-во эпох обучения
+    :param train_config:
+    :return:
+    """
     if train_config==TrainConfig.BORDERS:
-        return NetworkConfig(1000,250,1,2,1e-5)
+        return 500
     else:
         if train_config==TrainConfig.LETTERS_MERGED:
-            return NetworkConfig(2000,400,1,2,1e-6)
+            return 500
         else:
             if train_config==TrainConfig.LETTERS:
-                return NetworkConfig(10000,500,1,2,1e-8)
+                return 1000
+            else:
+                return 1000
+
+def get_network_config(train_config):
+    if train_config==TrainConfig.BORDERS:
+        return NetworkConfig(250,1,2,1e-5)
+    else:
+        if train_config==TrainConfig.LETTERS_MERGED:
+            return NetworkConfig(400,1,2,1e-6)
+        else:
+            if train_config==TrainConfig.LETTERS:
+                return NetworkConfig(500,1,2,1e-8)
+
+def get_model_name(train_config):
+    return train_config.name+".ckpt"
 
 def make_label(symbol,index):
     return {constants.CHAR_KEY:symbol,constants.INDEX_KEY:index}
