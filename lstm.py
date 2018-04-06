@@ -43,7 +43,7 @@ class LSTMDecoder:
 
     TINY = 1e-6  # to avoid NaNs in logs
 
-    def train(self, words, num_epochs=100,output_training=False,model_name="model.ckpt"):
+    def train(self, words, num_epochs=100, output_training=False, model_dir="model.ckpt"):
         """
         words--Список слов, содержащих точки и метки
         """
@@ -91,7 +91,7 @@ class LSTMDecoder:
                 # session.run(self.train_fn,feed_dict={self.inputs:batch_inputs, self.outputs:batch_labels})
             epoch_error /= num_words
             print("Epoch error:", epoch_error)
-        saver.save(session,"Models/"+model_name)
+        saver.save(session,"Models/" + model_dir + "/" + model_dir + ".ckpt")
         session.close()
         pass
 

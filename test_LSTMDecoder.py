@@ -15,12 +15,12 @@ class TestLSTMDecoder(TestCase):
 
         train_word.labels_list.extend(['а', 'и', 'а', 'и'])
         train_word.labels_list = full_alphabet.encode_char_labels(train_word.labels_list)
-        ld.train([train_word], 150,True, model_name="small_test.ckpt")
+        ld.train([train_word], 150, True, model_dir="small_test")
         test_word = prepdata.WordData()
         test_word.point_list.extend([(0, 0), (-1, 0.99)])
         test_word.labels_list.extend(['и', 'а'])
         test_word.labels_list = full_alphabet.encode_char_labels(test_word.labels_list)
-        labels, probs = ld.label([test_word.point_list], "Models/small_test.ckpt")
+        labels, probs = ld.label([test_word.point_list], "Models/small_test/small_test.ckpt")
         #char_labels = full_alphabet.decode_numeric_labels(labels)
         assert list(labels)==test_word.labels_list
 
