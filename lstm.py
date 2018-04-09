@@ -32,14 +32,14 @@ class LSTMDecoder:
         #session.run(tf.global_variables_initializer())
         length = [len(points[0])]
         points = np.asarray(points)
-        decoded, log_prob = session.run([self.decoded[0], self.log_prob],
+        decoded, log_prob,probs = session.run([self.decoded[0], self.log_prob,self.probs],
                                         feed_dict={self.inputs: points, self.seq_len: length})
         arr_decoded = np.asarray(decoded[1])
 
         session.close()
         #str_decoded = [(x) for x in arr_decoded]
         #print('Decoded string:', str_decoded)
-        return (arr_decoded, log_prob)
+        return (arr_decoded, log_prob,probs)
 
     TINY = 1e-6  # to avoid NaNs in logs
 
@@ -73,7 +73,7 @@ class LSTMDecoder:
                 targets_array = np.asarray(batch_labels)
                 targets_array = sparse_tuple_from(targets_array)
                 targets_sparse_tensor=tf.SparseTensor(targets_array[0],targets_array[1],targets_array[2])
-                s, loss, logits, ler, cast_seq,targets,_ = session.run([self.cost, self.loss, self.logits, self.ler,self.cast_seq,self.targets, self.train_fn],
+                s, loss, logits,probs, ler, cast_seq,targets,_ = session.run([self.cost, self.loss, self.logits,self.probs, self.ler,self.cast_seq,self.targets, self.train_fn],
                                                       feed_dict={self.inputs: inputs_arr, self.targets: targets_array,
                                                                  self.seq_len: seq_length})
                 indices=np.asarray(cast_seq.indices)
@@ -154,7 +154,9 @@ class LSTMDecoder:
         self.logits = tf.reshape(self.logits, [self.batch_size, -1, self.num_classes])
 
         # Time major
-        self.logits = tf.transpose(self.logits, (1, 0, 2))
+
+        self.logits = tf.transpose(self.logits, (1, 0, 2))#Shape: [seq_length,batch_size,num_classes]
+        self.probs=tf.nn.softmax(self.logits)#вероятность для [t,batch_num,class_num]
         #self.loss = tf.nn.ctc_loss(self.targets, self.logits, self.seq_len,preprocess_collapse_repeated=False,ctc_merge_repeated=False)
         self.loss = tf.nn.ctc_loss(self.targets, self.logits, self.seq_len,preprocess_collapse_repeated=True,ctc_merge_repeated=True)
         self.cost = tf.reduce_mean(self.loss)
