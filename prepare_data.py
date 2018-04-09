@@ -88,7 +88,9 @@ class DataHelper:
                 result_points.append(points[i])
         return result_points,result_labels
 
-    def load_lds(self,filename):
+
+
+    def load_lds(self,filename,merged_labels=False):
         """
         Добавляет в словарь точки слов из файла
         """
@@ -128,22 +130,27 @@ class DataHelper:
                         label=labels_list[j]
                         if label is not None:#Если не нулевая метка
                             is_labeled=True
-                            char_label=label['Item1']
-                            #integer_label=self.label_to_int(char_label)#Букву в число
-                            integer_label=self.labels_alphabet.label_to_int(char_label)
-                            word_index=label['Item2']#индекс слова в списке
+                            word_index = label['Item2']  # индекс слова в списке
                             tmp_words_data[word_index].point_list.append(vector)#сохранить данные слова по ключу
-                            tmp_words_data[word_index].labels_list.append(integer_label)
-                            print(word_index)
-                            assert(text[1].TextWords[word_index]!='')
+                            if not merged_labels:
+                                char_label=label['Item1']
+                                #integer_label=self.label_to_int(char_label)#Букву в число
+                                integer_label=self.labels_alphabet.label_to_int(char_label)
+                                tmp_words_data[word_index].labels_list.append(integer_label)
+                                print(word_index)
+                                assert(text[1].TextWords[word_index]!='')
                             tmp_words_data[word_index].text=text[1].TextWords[word_index]#Задать строку текста
-                        
+
             if is_labeled:#сохранить данные, только если в тексте есть метки
                 words_data.extend(filter(lambda w:w.text!='', tmp_words_data))
         for wd in words_data:#пройти по всем словам и сохранить данные в словарь слов по всем текстам
             if wd.text not in self.words_dict:#если в словаре нет данных для такого словаште
                 assert(wd.text!='')
                 self.words_dict[wd.text]=[]
+
+            #if merged_labels:  #TODO: Генерация списков меток из букв слов
+            #    for c in wd.text:
+
             #wd.labels_list=DataLoader.insert_blank_labels(wd.labels_list)
             #if self.labels_map_function is not None:
             #    wd.labels_dict=self.labels_map_function(wd.labels_list)
