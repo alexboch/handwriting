@@ -15,7 +15,7 @@ class TestLSTMDecoder(TestCase):
 
         train_word.labels_list.extend(['а', 'и', 'а', 'и'])
         train_word.labels_list = full_alphabet.encode_char_labels(train_word.labels_list)
-        ld.train([train_word], 150, True, model_dir="small_test")
+        ld.train([train_word], 250, True, model_dir="small_test")
         test_word = prepdata.WordData()
         test_word.point_list.extend([(0, 0), (-1, 0.99)])
         test_word.labels_list.extend(['и', 'а'])
