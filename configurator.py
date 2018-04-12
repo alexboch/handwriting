@@ -34,7 +34,7 @@ def get_num_epochs(train_config):
     :return:
     """
     if train_config==TrainConfig.BORDERS:
-        return 1
+        return 50
     else:
         if train_config==TrainConfig.LETTERS_MERGED:
             return 500
@@ -101,7 +101,7 @@ def framewise_mapper(labels_list):
         for i in np.arange(1,labels_count):
             current_label = labels_list[i]
             prev_label=labels_list[i-1]
-            if prev_label[constants.CHAR_KEY]==current_label[constants.CHAR_KEY]:#Если не граница
+            if prev_label[constants.CHAR_KEY]==current_label[constants.CHAR_KEY] or i==labels_count-1:#Если не граница
                 new_label=make_label(constants.NOISE_LABEL,prev_label[constants.INDEX_KEY])
             else:
                 new_label=make_label(constants.CONNECTION_LABEL,prev_label[constants.INDEX_KEY])
