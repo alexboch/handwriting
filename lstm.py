@@ -1,6 +1,7 @@
 import numpy as np
 import tensorflow as tf
 import csv
+import time
 import os
 from prepare_data import DataHelper
 from utils import *
@@ -56,8 +57,10 @@ class LSTMDecoder:
         session.run(tf.global_variables_initializer())
         num_batches = len(words) / self.batch_size
         num_words = len(words)
-        output_period=num_epochs/5#Выводить каждый раз, когда прошло 5% обучения
+        output_period=max(num_epochs/100.0*5,1)#Выводить каждый раз, когда прошло 5% обучения
         epoch_errors=[]
+        start_time=time.time()
+        prev_epoch_time=start_time
         for i in np.arange(num_epochs):
             #print("Epoch number ", str(i))
             np.random.shuffle(words)
@@ -100,15 +103,19 @@ class LSTMDecoder:
                 # session.run(self.train_fn,feed_dict={self.inputs:batch_inputs, self.outputs:batch_labels})
             epoch_error /= num_words
             edit_dist/=num_words
+
+            elapsed_time=time.time()-start_time
+
             if i%output_period==0 or i==num_epochs-1:
                 if output_training:
                     print("Epoch number:",i)
                     print("Epoch error:", epoch_error)
                     print(f"Edit distance:{edit_dist}")
-                epoch_errors.append({"Epoch":i,"Error":epoch_error,"Edit distance":edit_dist})
+                    print(f"Time:{elapsed_time}")
+                epoch_errors.append({"Epoch":i,"Error":epoch_error,"Edit distance":edit_dist,"Time":elapsed_time})
 
         #Вывод в csv-файл
-        headers=['Epoch','Error','Edit distance']
+        headers=['Epoch','Error','Edit distance',"Time"]
         model_dir_path=f"Models{os.sep}{model_name}"
         csv_path=os.path.join(model_dir_path,f"{model_name}.csv")
         if not os.path.exists(model_dir_path):

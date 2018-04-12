@@ -6,7 +6,7 @@ import tensorflow as tf
 
 
 tf.reset_default_graph()
-tb = TrainerBuilder(TrainConfig.LETTERS_MERGED)
+tb = TrainerBuilder(TrainConfig.BORDERS)
 tr = tb.trainer
 #tr.num_epochs=1
 #tr.load_data()
