@@ -11,4 +11,5 @@ tr = tb.trainer
 #tr.num_epochs=1
 #tr.load_data()
 #tr.train_network([tr.data_loader.get_words_list()[0]])
-tr.run_training()
+#tr.get_labels_for_list([tr.data_loader.get_words_list()[0]])
+tr.run_training(validate=True)

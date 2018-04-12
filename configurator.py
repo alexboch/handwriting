@@ -34,7 +34,7 @@ def get_num_epochs(train_config):
     :return:
     """
     if train_config==TrainConfig.BORDERS:
-        return 5
+        return 1
     else:
         if train_config==TrainConfig.LETTERS_MERGED:
             return 500

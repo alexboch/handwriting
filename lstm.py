@@ -24,10 +24,17 @@ class LSTMDecoder:
         self.alphabet=alphabet
         pass
 
-    def label(self, points,path_to_model):
+
+
+
+    def label(self, points,path_to_model=None,symbolic=False):
         """
         Принимает список точек и возвращает последовательность меток
         """
+        if path_to_model is None:
+            if self._checkpoint_path is None:
+                raise Exception("Model not found! Train model or supply valid path")
+            path_to_model=self._checkpoint_path
         saver=tf.train.Saver()
 
         session = tf.Session()
@@ -35,18 +42,19 @@ class LSTMDecoder:
         #session.run(tf.global_variables_initializer())
         length = [len(points[0])]
         points = np.asarray(points)
-        decoded, log_prob,probs = session.run([self.decoded[0], self.log_prob,self.probs],
+        decoded, log_prob,probs = session.run([self.decoded_integers, self.log_prob,self.probs],
                                         feed_dict={self.inputs: points, self.seq_len: length})
         arr_decoded = np.asarray(decoded[1])
-
+        if symbolic:
+            decoded=self.alphabet.decode_numeric_labels(arr_decoded)#Числовые метки в символьные
         session.close()
         #str_decoded = [(x) for x in arr_decoded]
         #print('Decoded string:', str_decoded)
-        return (arr_decoded, log_prob,probs)
+        return (arr_decoded,log_prob,probs)
 
     TINY = 1e-6  # to avoid NaNs in logs
 
-    def train(self, words, num_epochs=100, output_training=False, model_name="model.ckpt"):
+    def train(self, words, num_epochs=100, output_training=False, model_name="model.ckpt",model_dir_path=f"Models{os.sep}model.ckpt",):
         """
         words--Список слов, содержащих точки и метки
         """
@@ -114,23 +122,26 @@ class LSTMDecoder:
                     print(f"Time:{elapsed_time}")
                 epoch_errors.append({"Epoch":i,"Error":epoch_error,"Edit distance":edit_dist,"Time":elapsed_time})
 
+        for epoch_error in epoch_errors:
+            for k,v in epoch_error.items():
+                epoch_error[k]=str(v).replace('.',',')#Заменить на запятую, чтобы excel понимал
         #Вывод в csv-файл
         headers=['Epoch','Error','Edit distance',"Time"]
-        model_dir_path=f"Models{os.sep}{model_name}"
-        csv_path=os.path.join(model_dir_path,f"{model_name}.csv")
+
+        self._csv_path=os.path.join(model_dir_path,f"{model_name}.csv")
         if not os.path.exists(model_dir_path):
             os.makedirs(model_dir_path)#Создать папку модели, если она не существует
-        with open(csv_path, 'w+',newline='') as csvfile:
+        with open(self._csv_path, 'w+',newline='') as csvfile:
             sep=getListSeparator()#Получить разделитель для текущих настроек локали
             csvwriter=csv.DictWriter(csvfile,fieldnames=headers,delimiter=sep)
             csvwriter.writeheader()
             for i in np.arange(len(epoch_errors)):
                 data=epoch_errors[i]
                 csvwriter.writerow(data)#Записать строку в csv
-        checkpoint_path=os.path.join(model_dir_path,model_name)#Путь к сохраненному графу
-        saver.save(session,checkpoint_path)
+        self._checkpoint_path=os.path.join(model_dir_path, model_name)#Путь к сохраненному графу
+        saver.save(session,self._checkpoint_path)
         session.close()
-        pass
+        return epoch_errors
 
     def lstm_cell(self):
         cell = tf.contrib.rnn.LSTMCell(self.num_units, state_is_tuple=True)
