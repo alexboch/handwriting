@@ -19,13 +19,16 @@ class Trainer:
     def load_data(self):
         return self.data_loader.load_labeled_texts(self.data_directory)
 
-    def train_network(self,data):
+    def train_network(self,data=None):
+        if data is None:
+            data=self.data_loader.get_words_list()
         self.network.train(data,self.num_epochs,self.output_training,self.model_name)
         pass
 
 
     def run_training(self):
-        data=self.load_data()
-        self.train_network(data)
+        self.load_data()
+
+        self.train_network(self.data_loader.get_words_list())
 
         pass

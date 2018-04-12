@@ -1,5 +1,7 @@
 import numpy as np
 import tensorflow as tf
+import csv
+import os
 from prepare_data import DataHelper
 from utils import *
 import tensorflow.contrib.layers as layers
@@ -43,20 +45,25 @@ class LSTMDecoder:
 
     TINY = 1e-6  # to avoid NaNs in logs
 
-    def train(self, words, num_epochs=100, output_training=False, model_dir="model.ckpt"):
+    def train(self, words, num_epochs=100, output_training=False, model_name="model.ckpt"):
         """
         words--Список слов, содержащих точки и метки
         """
         # init_op = tf.initialize_all_variables()
+        print("starting training,epochs:",num_epochs,"learning rate:",self.learning_rate)
         saver=tf.train.Saver()
         session = tf.Session()
         session.run(tf.global_variables_initializer())
         num_batches = len(words) / self.batch_size
         num_words = len(words)
+        output_period=num_epochs/5#Выводить каждый раз, когда прошло 5% обучения
+        epoch_errors=[]
         for i in np.arange(num_epochs):
-            print("Epoch number ", str(i))
+            #print("Epoch number ", str(i))
             np.random.shuffle(words)
             epoch_error = 0  # Средняя ошибка по всем батчам в данной эпохе
+            edit_dist=0#По расстоянию редактирования
+            can_output=output_training and (i%output_period==0 or i==num_epochs-1)
             for j in np.arange(0, num_words, self.batch_size):  # Цикл по всем словам, берем по batch_size слов
                 j1 = j
                 j2 = j1 + self.batch_size
@@ -72,26 +79,49 @@ class LSTMDecoder:
                 inputs_arr = np.asarray(batch_inputs)
                 targets_array = np.asarray(batch_labels)
                 targets_array = sparse_tuple_from(targets_array)
-                targets_sparse_tensor=tf.SparseTensor(targets_array[0],targets_array[1],targets_array[2])
-                s, loss, logits,probs, ler, cast_seq,targets,_ = session.run([self.cost, self.loss, self.logits,self.probs, self.ler,self.cast_seq,self.targets, self.train_fn],
-                                                      feed_dict={self.inputs: inputs_arr, self.targets: targets_array,
+                #targets_sparse_tensor=tf.SparseTensor(targets_array[0],targets_array[1],targets_array[2])
+                s, loss, logits,probs, ler, decoded_integers,targets,_ = session.run([self.cost, self.loss, self.logits, self.probs, self.ler, self.decoded_integers, self.targets, self.train_fn],
+                                                                             feed_dict={self.inputs: inputs_arr, self.targets: targets_array,
                                                                  self.seq_len: seq_length})
-                indices=np.asarray(cast_seq.indices)
-                if output_training:
-                    target_values = np.asarray(cast_seq.values)
+                #indices=np.asarray(decoded_integers.indices)
+                if can_output:
+                    target_values = np.asarray(decoded_integers.values)
                     char_decoded=self.alphabet.decode_numeric_labels(target_values)
                     print("Decoded chars:",char_decoded)
+                    print('batch loss:', loss)
+                    print('edit distance error:', ler)
                 #target_indices=np.asarray(targets_array.indices)
                 #
-                print('batch loss:', loss)
-                print('edit distance error:', ler)
+
                 # print('logits:',logits)
+                edit_dist+=ler
                 epoch_error += s
                 # print("Batch cost:",s)
                 # session.run(self.train_fn,feed_dict={self.inputs:batch_inputs, self.outputs:batch_labels})
             epoch_error /= num_words
-            print("Epoch error:", epoch_error)
-        saver.save(session,"Models/" + model_dir + "/" + model_dir + ".ckpt")
+            edit_dist/=num_words
+            if i%output_period==0 or i==num_epochs-1:
+                if output_training:
+                    print("Epoch number:",i)
+                    print("Epoch error:", epoch_error)
+                    print(f"Edit distance:{edit_dist}")
+                epoch_errors.append({"Epoch":i,"Error":epoch_error,"Edit distance":edit_dist})
+
+        #Вывод в csv-файл
+        headers=['Epoch','Error','Edit distance']
+        model_dir_path=f"Models{os.sep}{model_name}"
+        csv_path=os.path.join(model_dir_path,f"{model_name}.csv")
+        if not os.path.exists(model_dir_path):
+            os.makedirs(model_dir_path)#Создать папку модели, если она не существует
+        with open(csv_path, 'w+',newline='') as csvfile:
+            sep=getListSeparator()#Получить разделитель для текущих настроек локали
+            csvwriter=csv.DictWriter(csvfile,fieldnames=headers,delimiter=sep)
+            csvwriter.writeheader()
+            for i in np.arange(len(epoch_errors)):
+                data=epoch_errors[i]
+                csvwriter.writerow(data)#Записать строку в csv
+        checkpoint_path=os.path.join(model_dir_path,model_name)#Путь к сохраненному графу
+        saver.save(session,checkpoint_path)
         session.close()
         pass
 
@@ -158,12 +188,12 @@ class LSTMDecoder:
         self.logits = tf.transpose(self.logits, (1, 0, 2))#Shape: [seq_length,batch_size,num_classes]
         self.probs=tf.nn.softmax(self.logits)#вероятность для [t,batch_num,class_num]
         #self.loss = tf.nn.ctc_loss(self.targets, self.logits, self.seq_len,preprocess_collapse_repeated=False,ctc_merge_repeated=False)
-        self.loss = tf.nn.ctc_loss(self.targets, self.logits, self.seq_len,preprocess_collapse_repeated=True,ctc_merge_repeated=True)
+        self.loss = tf.nn.ctc_loss(self.targets, self.logits, self.seq_len,preprocess_collapse_repeated=False,ctc_merge_repeated=False)
         self.cost = tf.reduce_mean(self.loss)
         self.train_fn = tf.train.MomentumOptimizer(self.learning_rate,
                                                    0.99).minimize(self.cost)
         #self.decoded, self.log_prob = tf.nn.ctc_greedy_decoder(self.logits, self.seq_len,merge_repeated=False)
-        self.decoded, self.log_prob = tf.nn.ctc_greedy_decoder(self.logits, self.seq_len,merge_repeated=True)
-        self.cast_seq=tf.cast(self.decoded[0],tf.int32)
-        self.ler = tf.reduce_mean(tf.edit_distance(self.cast_seq, self.targets))
+        self.decoded, self.log_prob = tf.nn.ctc_greedy_decoder(self.logits, self.seq_len,merge_repeated=False)
+        self.decoded_integers=tf.cast(self.decoded[0], tf.int32)
+        self.ler = tf.reduce_mean(tf.edit_distance(self.decoded_integers, self.targets))
         pass

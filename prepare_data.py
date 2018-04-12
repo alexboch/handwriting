@@ -114,33 +114,36 @@ class DataHelper:
             #
 
             is_labeled=False
-            for i in np.arange(len(pl.PointLists)):#Цикл по всем спискам точек
-                #points_list=pl.PointLists[i]
-                #labels_list=pl.Labels[i]
-                points_list,labels_list=DataHelper.filter_nans(pl.PointLists[i],pl.Labels[i])
-                if len(points_list)>0:#Если есть хоть одна метка
-                    if self.labels_map_function is not None:
-                        labels_list=self.labels_map_function(labels_list)
-                    points_list=list(map(methodcaller("split",","),points_list))#разделить координаты на x и y
-                    #map(lambda p: p.split(","),points_list)
-                    points_list=list(map(lambda x:list(map(float, x)),points_list))#превратить координаты в числа
-                    vectors=DataHelper.get_vectors_from_points(points_list)
-                    for j in np.arange(len(vectors)):#Цикл по всем точкам списка
-                        vector=vectors[j]
-                        label=labels_list[j]
-                        if label is not None:#Если не нулевая метка
-                            is_labeled=True
-                            word_index = label['Item2']  # индекс слова в списке
-                            tmp_words_data[word_index].point_list.append(vector)#сохранить данные слова по ключу
-                            if not merged_labels:
-                                char_label=label['Item1']
-                                #integer_label=self.label_to_int(char_label)#Букву в число
-                                integer_label=self.labels_alphabet.label_to_int(char_label)
-                                tmp_words_data[word_index].labels_list.append(integer_label)
-                                print(word_index)
-                                assert(text[1].TextWords[word_index]!='')
-                            tmp_words_data[word_index].text=text[1].TextWords[word_index]#Задать строку текста
+            try:
+                for i in np.arange(len(pl.PointLists)):#Цикл по всем спискам точек
+                    #points_list=pl.PointLists[i]
+                    #labels_list=pl.Labels[i]
+                    points_list,labels_list=DataHelper.filter_nans(pl.PointLists[i],pl.Labels[i])
+                    if len(points_list)>0:#Если есть хоть одна метка
+                        if self.labels_map_function is not None:
+                            labels_list=self.labels_map_function(labels_list)
+                        points_list=list(map(methodcaller("split",","),points_list))#разделить координаты на x и y
+                        #map(lambda p: p.split(","),points_list)
+                        points_list=list(map(lambda x:list(map(float, x)),points_list))#превратить координаты в числа
+                        vectors=DataHelper.get_vectors_from_points(points_list)
+                        for j in np.arange(len(vectors)):#Цикл по всем точкам списка
+                            vector=vectors[j]
+                            label=labels_list[j]
+                            if label is not None:#Если не нулевая метка
+                                is_labeled=True
+                                word_index = label['Item2']  # индекс слова в списке
+                                tmp_words_data[word_index].point_list.append(vector)#сохранить данные слова по ключу
+                                if not merged_labels:
+                                    char_label=label['Item1']
+                                    #integer_label=self.label_to_int(char_label)#Букву в число
+                                    integer_label=self.labels_alphabet.label_to_int(char_label)
+                                    tmp_words_data[word_index].labels_list.append(integer_label)
 
+                                    assert(text[1].TextWords[word_index]!='')
+                                tmp_words_data[word_index].text=text[1].TextWords[word_index]#Задать строку текста
+            except IndexError as index_exception:
+
+                print(index_exception)
             if is_labeled:#сохранить данные, только если в тексте есть метки
                 words_data.extend(filter(lambda w:w.text!='', tmp_words_data))
         for wd in words_data:#пройти по всем словам и сохранить данные в словарь слов по всем текстам

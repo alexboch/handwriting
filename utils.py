@@ -8,9 +8,19 @@ from six.moves import xrange as range
 import os
 import sys
 import numpy as np
+from winreg import *
 
 url = 'https://catalog.ldc.upenn.edu/desc/addenda/'
 last_percent_reported = None
+
+
+def getListSeparator():
+    '''Retrieves the Windows list separator character from the registry'''
+    aReg = ConnectRegistry(None, HKEY_CURRENT_USER)
+    aKey = OpenKey(aReg, r"Control Panel\International")
+    val = QueryValueEx(aKey, "sList")[0]
+    return val
+
 
 def download_progress_hook(count, blockSize, totalSize):
     """A hook to report the progress of a download. This is mostly intended for

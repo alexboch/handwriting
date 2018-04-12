@@ -8,6 +8,9 @@ import tensorflow as tf
 dir = os.path.dirname(os.path.realpath(__file__))
 
 class GraphHelper:
+
+
+
     @staticmethod
     def freeze_graph(model_dir, output_node_names):
         """Extract the sub graph defined by the output nodes and convert

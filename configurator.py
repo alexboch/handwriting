@@ -46,10 +46,10 @@ def get_num_epochs(train_config):
 
 def get_network_config(train_config):
     if train_config==TrainConfig.BORDERS:
-        return NetworkConfig(250,1,2,1e-5)
+        return NetworkConfig(num_units=250,num_layers=1,num_features=2,learning_rate=1e-8)
     else:
         if train_config==TrainConfig.LETTERS_MERGED:
-            return NetworkConfig(400,1,2,1e-6)
+            return NetworkConfig(num_units=400,num_layers=1,num_features=2,learning_rate=1e-6)
         else:
             if train_config==TrainConfig.LETTERS:
                 return NetworkConfig(500,1,2,1e-8)
@@ -57,7 +57,7 @@ def get_network_config(train_config):
                 return NetworkConfig(500, 1, 2, 1e-8)
 
 def get_model_name(train_config):
-    return train_config.name+".ckpt"
+    return train_config.name
 
 def make_label(symbol,index):
     return {constants.CHAR_KEY:symbol,constants.INDEX_KEY:index}
@@ -96,6 +96,8 @@ def framewise_mapper(labels_list):
     labels_count=len(labels_list)
 
     if labels_count>0:
+        first_label=make_label(constants.CONNECTION_LABEL,labels_list[0][constants.INDEX_KEY])
+        result_list.append(first_label)
         for i in np.arange(1,labels_count):
             current_label = labels_list[i]
             prev_label=labels_list[i-1]
@@ -113,6 +115,8 @@ def get_alphabet(train_config):
     else:
         if train_config is TrainConfig.LETTERS or train_config is TrainConfig.LETTERS_MERGED:
             chars=[chr(x+1040) for x in range(65)]#Русский алфавит в UTF-8
+            chars.append('Ё')
+            chars.append('ё')
             chars.append(constants.CONNECTION_LABEL)
             chars.append(constants.NOISE_LABEL)
         else:
