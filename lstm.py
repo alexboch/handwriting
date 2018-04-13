@@ -29,25 +29,21 @@ class LSTMDecoder:
 
 
 
-    def label(self, points, path_to_model=None,model_dir=None, symbolic=False):
+    def label(self, points, model_name:str, model_dir:str, symbolic=False):
         """
-
         :param points: Последовательность из последовательностей точек
-        :param path_to_model:полный путь к метаграфу
+        :param model_name:имя модели
         :param model_dir: путь к папке с сохраненной моделью
         :param symbolic: Преобразовывать ли числовые метки в символы
         :return:
         """
-        if path_to_model is None:
-            if self._checkpoint_path is None:
-                raise Exception("Model not found! Train model or supply valid path")
-            path_to_model=self._checkpoint_path
 
-        path_to_model= path_to_model + ".meta"
+
+        model_name= os.path.join(model_dir,model_name + ".meta")
         #session = tf.Session()
         with tf.Session() as session:
         #saver = tf.train.Saver()
-            saver=tf.train.import_meta_graph(path_to_model)
+            saver=tf.train.import_meta_graph(model_name)
             saver.restore(session, tf.train.latest_checkpoint(model_dir))#Загрузить натренированную модель
             #session.run(tf.global_variables_initializer())
             length = [len(points_list) for points_list in points]
@@ -65,7 +61,7 @@ class LSTMDecoder:
 
     TINY = 1e-6  # to avoid NaNs in logs
 
-    def train(self, words, num_epochs=100, output_training=False, model_name="model.ckpt",model_dir_path=f"Models{os.sep}model.ckpt",):
+    def train(self, words, num_epochs=100, output_training=False, model_name="model",model_dir_path=f"Models{os.sep}model",):
         """
         words--Список слов, содержащих точки и метки
         """
