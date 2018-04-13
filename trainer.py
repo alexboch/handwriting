@@ -25,7 +25,7 @@ class Trainer:
     def train_network(self,data=None):
         if data is None:
             data=self.data_loader.get_words_list()
-        self.network.train(data,self.num_epochs,self.output_training,self.model_name)
+        self.network.train(data,self.num_epochs,self.output_training,self.model_name,self.model_dir_path)
         pass
 
 
@@ -35,13 +35,19 @@ class Trainer:
         :param words_list:Список слов
         :return: Список меток в виде чисел
         """
-
-        return [self.network.label([word.point_list],symbolic=True) for word in words_list]
+        points=[word.point_list for word in words_list]
+        return self.network.label(points,model_dir='D:\Projects\Python\handwriting\Data\BORDERS\\')
+        #return [self.network.label([word.point_list])[0] for word in words_list]
 
     def run_training(self,validate=False):
         self.load_data()
         training_data=self.data_loader.get_words_list()
-
+        #points = [word.point_list for word in training_data]
+        points=[]
+        for word in training_data:
+            points.append(word.point_list)
+        target_labels = [word.labels_list for word in training_data]
+        #self.network.label(points, path_to_model='D:\Projects\Python\handwriting\Data\BORDERS\BORDERS',model_dir='D:\Projects\Python\handwriting\Data\BORDERS\\')
         data_len=len(training_data)
         validate=validate and data_len>1
         if validate:
@@ -51,10 +57,18 @@ class Trainer:
             train_len=data_len-valid_len#80 на обучение
             validation_data=training_data[:valid_len]
             training_data=training_data[valid_len:]
+
         train_stat=self.train_network(training_data)
 
         if validate:
-            decoded_labels=self.get_labels_for_list(validation_data)
-            target_labels=[self.data_loader.labels_map_function(word) for word in validation_data]
-            validation_error=levenshtein(decoded_labels,target_labels)/(len(target_labels)+len(decoded_labels))#нормализованное расстояние редактирования
+            decoded_labels_list=self.get_labels_for_list(validation_data)
+            target_labels_list=[word.labels_list for word in validation_data]
+            #validation_error=levenshtein(decoded_labels,target_labels)/(len(target_labels)+len(decoded_labels))#нормализованное расстояние редактирования
+            validation_error=0.0
+            for i in range(len(decoded_labels_list)):
+                decoded_labels=decoded_labels_list[i]
+                target_labels=target_labels_list[i]
+                validation_error+=levenshtein(decoded_labels,target_labels)/(len(target_labels)+len(decoded_labels))#нормализованное расстояние редактирования
+            validation_error/=len(decoded_labels_list)#Среднее расстояние редактирования по всем спискам точек
+            print(f"Validation error:{validation_error}")
         pass

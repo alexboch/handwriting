@@ -27,30 +27,41 @@ class LSTMDecoder:
 
 
 
-    def label(self, points,path_to_model=None,symbolic=False):
+
+
+    def label(self, points, path_to_model=None,model_dir=None, symbolic=False):
         """
-        Принимает список точек и возвращает последовательность меток
+
+        :param points: Последовательность из последовательностей точек
+        :param path_to_model:полный путь к метаграфу
+        :param model_dir: путь к папке с сохраненной моделью
+        :param symbolic: Преобразовывать ли числовые метки в символы
+        :return:
         """
         if path_to_model is None:
             if self._checkpoint_path is None:
                 raise Exception("Model not found! Train model or supply valid path")
             path_to_model=self._checkpoint_path
-        saver=tf.train.Saver()
 
-        session = tf.Session()
-        saver.restore(session,path_to_model)#Загрузить натренированную модель
-        #session.run(tf.global_variables_initializer())
-        length = [len(points[0])]
-        points = np.asarray(points)
-        decoded, log_prob,probs = session.run([self.decoded_integers, self.log_prob,self.probs],
-                                        feed_dict={self.inputs: points, self.seq_len: length})
-        arr_decoded = np.asarray(decoded[1])
-        if symbolic:
-            decoded=self.alphabet.decode_numeric_labels(arr_decoded)#Числовые метки в символьные
-        session.close()
-        #str_decoded = [(x) for x in arr_decoded]
-        #print('Decoded string:', str_decoded)
-        return (arr_decoded,log_prob,probs)
+        path_to_model= path_to_model + ".meta"
+        #session = tf.Session()
+        with tf.Session() as session:
+        #saver = tf.train.Saver()
+            saver=tf.train.import_meta_graph(path_to_model)
+            saver.restore(session, tf.train.latest_checkpoint(model_dir))#Загрузить натренированную модель
+            #session.run(tf.global_variables_initializer())
+            length = [len(points_list) for points_list in points]
+            decoded_list=[]
+            for points_list in points:
+                input_arr=np.asarray(points_list)
+                input_arr=np.expand_dims(input_arr,0)
+                decoded, log_prob,probs = session.run([self.decoded_integers, self.log_prob,self.probs],
+                                                feed_dict={self.inputs: input_arr, self.seq_len: [len(points_list)]})
+                arr_decoded = np.asarray(decoded.values)
+                if symbolic:
+                    arr_decoded=self.alphabet.decode_numeric_labels(arr_decoded)#Числовые метки в символьные
+                decoded_list.append(arr_decoded)
+        return np.asarray(decoded_list)
 
     TINY = 1e-6  # to avoid NaNs in logs
 
@@ -58,9 +69,7 @@ class LSTMDecoder:
         """
         words--Список слов, содержащих точки и метки
         """
-        # init_op = tf.initialize_all_variables()
         print("starting training,epochs:",num_epochs,"learning rate:",self.learning_rate)
-        saver=tf.train.Saver()
         session = tf.Session()
         session.run(tf.global_variables_initializer())
         num_batches = len(words) / self.batch_size
@@ -101,14 +110,9 @@ class LSTMDecoder:
                     print("Decoded chars:",char_decoded)
                     print('batch loss:', loss)
                     print('edit distance error:', ler)
-                #target_indices=np.asarray(targets_array.indices)
-                #
 
-                # print('logits:',logits)
                 edit_dist+=ler
                 epoch_error += s
-                # print("Batch cost:",s)
-                # session.run(self.train_fn,feed_dict={self.inputs:batch_inputs, self.outputs:batch_labels})
             epoch_error /= num_words
             edit_dist/=num_words
 
@@ -139,6 +143,7 @@ class LSTMDecoder:
                 data=epoch_errors[i]
                 csvwriter.writerow(data)#Записать строку в csv
         self._checkpoint_path=os.path.join(model_dir_path, model_name)#Путь к сохраненному графу
+        saver = tf.train.Saver()
         saver.save(session,self._checkpoint_path)
         session.close()
         return epoch_errors
@@ -179,8 +184,8 @@ class LSTMDecoder:
         # for i in range(self.num)
 
         self.W = tf.Variable(
-            tf.truncated_normal([self.num_units, self.num_classes], stddev=0.1))  # Начальная матрица весов
-        self.b = tf.Variable(tf.constant(0., shape=[self.num_classes]))
+            tf.truncated_normal([self.num_units, self.num_classes], stddev=0.1),name='W')  # Начальная матрица весов
+        self.b = tf.Variable(tf.constant(0., shape=[self.num_classes]),name='b')
         # Given inputs (time, batch, input_size) outputs a tuple
         #  - outputs: (time, batch, output_size)  [do not mistake with OUTPUT_SIZE]
         #  - states:  (time, batch, hidden_size)
