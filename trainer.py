@@ -3,6 +3,7 @@ import tensorflow as tf
 import numpy as np
 from utils import levenshtein
 from lstm import *
+from datetime import datetime
 
 class Trainer:
     """
@@ -25,9 +26,12 @@ class Trainer:
     def train_network(self,data=None):
         if data is None:
             data=self.data_loader.get_words_list()
-        self.network.train(data,self.num_epochs,self.output_training,self.model_name,self.model_dir_path)
+        model_dir_path_with_datetime=self.model_dir_path+datetime.now().strftime('%d-%m-%Y-%I_%m_%S')
+        self.network.train(data,self.num_epochs,self.output_training,self.model_name,model_dir_path_with_datetime)
         pass
 
+    def set_learning_rate(self,learning_rate):
+        self.network.learning_rate=learning_rate
 
     def get_labels_for_list(self, words_list):
         """
@@ -36,7 +40,7 @@ class Trainer:
         :return: Список меток в виде чисел
         """
         points=[word.point_list for word in words_list]
-        return self.network.label(points,model_dir='D:\Projects\Python\handwriting\Data\BORDERS\\')
+        return self.network.label(points,model_dir='D:\Projects\Python\handwriting\Data\BORDERS\\',model_name='BORDERS')
         #return [self.network.label([word.point_list])[0] for word in words_list]
 
     def run_training(self,validate=False):

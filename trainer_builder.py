@@ -33,6 +33,8 @@ class TrainerBuilder:
         pass
 
 
+    def set_learning_rate(self,learning_rate):
+        self._trainer.set_learning_rate(learning_rate)
 
 
     @property
