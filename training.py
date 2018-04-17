@@ -8,9 +8,9 @@ import tensorflow as tf
 tf.reset_default_graph()
 tb = TrainerBuilder(TrainConfig.BORDERS)
 tb.set_learning_rate(1e-2)
-tr = tb.trainer
+tr = tb.build_trainer()
 
-#tr.num_epochs=1
+tr.num_epochs=1
 #tr.load_data()
 #tr.train_network([tr.data_loader.get_words_list()[0]])
 #tr.get_labels_for_list([tr.data_loader.get_words_list()[0]])

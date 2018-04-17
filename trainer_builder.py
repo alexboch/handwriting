@@ -19,23 +19,25 @@ class TrainerBuilder:
 
     def __init__(self,init_config=None):
         if init_config!=None:
-            alphabet=conf.get_alphabet(init_config)
-            labels_mapper=conf.get_labels_mapper(init_config)
-            net_config=conf.get_network_config(init_config)
-            num_classes=alphabet.get_length()+1#Для всех символов + пустая метка
-            num_epochs=conf.get_num_epochs(init_config)
-            network=LSTMDecoder(net_config.num_units,net_config.num_layers,net_config.num_features,num_classes,
-                                net_config.learning_rate,net_config.batch_size,alphabet)
-            model_name=conf.get_model_name(init_config)
-            data_dir=conf.get_data_directory(init_config)
-            data_loader=pd.DataHelper(alphabet,labels_mapper)
-            self._trainer = tr.Trainer(network, data_loader, num_epochs, model_name, data_dir, True)
+            self.alphabet=conf.get_alphabet(init_config)
+            self.labels_mapper=conf.get_labels_mapper(init_config)
+            self.net_config=conf.get_network_config(init_config)
+            self.num_classes=self.alphabet.get_length()+1#Для всех символов + пустая метка
+            self.num_epochs=conf.get_num_epochs(init_config)
+            self.network=LSTMDecoder(self.net_config.num_units,self.net_config.num_layers,self.net_config.num_features,self.num_classes,
+                                self.net_config.learning_rate,self.net_config.batch_size,self.alphabet)
+            self.model_name=conf.get_model_name(init_config)
+            self.data_dir=conf.get_data_directory(init_config)
+            self.data_loader=pd.DataHelper(self.alphabet,self.labels_mapper)
+            #self._trainer = tr.Trainer(self.network, self.data_loader, self.num_epochs, self.model_name, self.data_dir, True)
         pass
 
 
     def set_learning_rate(self,learning_rate):
-        self._trainer.set_learning_rate(learning_rate)
+        self.net_config.learning_rate=learning_rate
 
+    def build_trainer(self):
+        return tr.Trainer(self.network, self.data_loader, self.num_epochs, self.model_name, self.data_dir, True)
 
     @property
     def trainer(self):
@@ -49,8 +51,8 @@ class TrainerBuilder:
 
     @property
     def load_dir(self):
-        return self._trainer.data_directory
+        return self.data_dir
 
     @load_dir.setter
     def load_dir(self,value):
-        self._trainer.data_directory=value
+        self.data_dir=value

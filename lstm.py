@@ -80,6 +80,7 @@ class LSTMDecoder:
             epoch_error = 0  # Средняя ошибка по всем батчам в данной эпохе
             edit_dist=0#По расстоянию редактирования
             can_output=output_training and (i%output_period==0 or i==num_epochs-1)
+            self.batch_size = 2
             for j in np.arange(0, num_words, self.batch_size):  # Цикл по всем словам, берем по batch_size слов
                 j1 = j
                 j2 = j1 + self.batch_size
@@ -87,14 +88,17 @@ class LSTMDecoder:
                 batch_inputs = []
                 batch_labels = []
                 seq_length = []  # Вектор длин каждой последовательности
+
                 # получить список точек и меток
                 for w in batch_words:
                     batch_inputs.append(w.point_list)
                     seq_length.append(len(w.point_list))  # Присоединяем длину последовательности точек
                     batch_labels.append(w.labels_list)
                 inputs_arr = np.asarray(batch_inputs)
-                targets_array = np.asarray(batch_labels)
-                targets_array = sparse_tuple_from(targets_array)
+                targets_array = np.asarray(batch_labels)#TODO:Преобразовать метку в вектор вероятностей(1.0-в позиции с номером класса, остадьные-0)
+                #targets_array = sparse_tuple_from(targets_array)
+                #targets_array=np.reshape(targets_array,newshape=(-1,self.batch_size,self.num_classes)
+                
                 #targets_sparse_tensor=tf.SparseTensor(targets_array[0],targets_array[1],targets_array[2])
                 s, loss, logits,probs, ler, decoded_integers,targets,_ = session.run([self.cost, self.loss, self.logits, self.probs, self.ler, self.decoded_integers, self.targets, self.train_fn],
                                                                              feed_dict={self.inputs: inputs_arr, self.targets: targets_array,
@@ -166,14 +170,17 @@ class LSTMDecoder:
         self.learning_rate = learning_rate
         self.inputs = tf.placeholder(tf.float32, [None, None, num_features], name='inputs')
         self.num_classes = num_classes
+        self.num_features=num_features
+        self.batch_size = batch_size
         shape = tf.shape(self.inputs)
         batch_s, max_timesteps = shape[0], shape[1]
         # self.targets = tf.placeholder(tf.float32, (None, None, num_classes))#
         # Here we use sparse_placeholder that will generate a
         # SparseTensor required by ctc_loss op.
 
-        self.targets = tf.sparse_placeholder(tf.int32)
-
+        #self.targets = tf.sparse_placeholder(tf.int32)
+        #self.targets=tf.placeholder(tf.int32,[None,batch_size])
+        self.targets=tf.placeholder(tf.float32,shape=[None,self.batch_size,self.num_classes],name='targets')
         self.cells_stack = tf.contrib.rnn.MultiRNNCell([self.lstm_cell() for _ in range(self.num_layers)],
                                                        state_is_tuple=True)
 
@@ -185,7 +192,7 @@ class LSTMDecoder:
         # Given inputs (time, batch, input_size) outputs a tuple
         #  - outputs: (time, batch, output_size)  [do not mistake with OUTPUT_SIZE]
         #  - states:  (time, batch, hidden_size)
-        self.batch_size = batch_size
+
         # 1d array of size [batch_size]
         self.seq_len = tf.placeholder(tf.int32, [None], name='seq_len')
         # rnn_outputs--Тензор размерности [batch_size,max_time,cell.output_size],max_time--кол-во точек слова,cell.output_size=2(x,y координаты)
@@ -207,12 +214,17 @@ class LSTMDecoder:
         self.logits = tf.transpose(self.logits, (1, 0, 2))#Shape: [seq_length,batch_size,num_classes]
         self.probs=tf.nn.softmax(self.logits)#вероятность для [t,batch_num,class_num]
         #self.loss = tf.nn.ctc_loss(self.targets, self.logits, self.seq_len,preprocess_collapse_repeated=False,ctc_merge_repeated=False)
-        self.loss = tf.nn.ctc_loss(self.targets, self.logits, self.seq_len,preprocess_collapse_repeated=False,ctc_merge_repeated=False)
+
+        self.loss=tf.nn.sigmoid_cross_entropy_with_logits(labels=self.targets,logits=self.logits)
+        #self.loss=tf.nn.sparse_softmax_cross_entropy_with_logits(labels=self.targets,logits=self.logits,name='loss')
+        #self.loss = tf.nn.ctc_loss(self.targets, self.logits, self.seq_len,preprocess_collapse_repeated=False,ctc_merge_repeated=False)
+
         self.cost = tf.reduce_mean(self.loss)
         self.train_fn = tf.train.MomentumOptimizer(self.learning_rate,
                                                    0.99).minimize(self.cost)
         #self.decoded, self.log_prob = tf.nn.ctc_greedy_decoder(self.logits, self.seq_len,merge_repeated=False)
         self.decoded, self.log_prob = tf.nn.ctc_greedy_decoder(self.logits, self.seq_len,merge_repeated=False)
         self.decoded_integers=tf.cast(self.decoded[0], tf.int32)
-        self.ler = tf.reduce_mean(tf.edit_distance(self.decoded_integers, self.targets))
+        self.ler=-1
+        #self.ler = tf.reduce_mean(tf.edit_distance(self.decoded_integers, self.targets))
         pass
