@@ -12,13 +12,23 @@ class LabelsAlphabet:
     """
     Содержит методы преобразования между числовыми метками и буквенными
     """
-    def __init__(self,characters=None):
+    def __init__(self,characters):
         self.int_to_char_dict={}#Словарь для преобразования из числовой метки в буквенную
         self.char_to_int_dict={}#Словарь для преобразования из буквенной метки в числовую
-        for i in np.arange(len(characters)):
+        self.num_chars=len(characters)
+        for i in np.arange(self.num_chars):
             self.int_to_char_dict[i]=characters[i]
             self.char_to_int_dict[characters[i]]=i
 
+
+
+    def one_hot(self,labels):
+        one_hot_labels=[]
+        for label in labels:
+            vector=[0]*self.num_chars
+            vector[label]=1.0
+            one_hot_labels.append(vector)
+        return one_hot_labels
 
     def label_to_int(self,char_label):
         return self.char_to_int_dict[char_label]

@@ -27,6 +27,30 @@ class LSTMDecoder:
 
 
 
+    def get_probabilities(self,points,model_name,model_dir):
+        """
+        :param points:Список входных точек
+        :param model_name:
+        :param model_dir:
+        :return:Вероятности каждого класса для каждой точки каждого списка
+        """
+        model_name = os.path.join(model_dir, model_name + ".meta")
+        # session = tf.Session()
+        with tf.Session() as session:
+            # saver = tf.train.Saver()
+            saver = tf.train.import_meta_graph(model_name)
+            saver.restore(session, tf.train.latest_checkpoint(model_dir))  # Загрузить натренированную модель
+            # session.run(tf.global_variables_initializer())
+            length = [len(points_list) for points_list in points]
+            probs_list = []
+            for points_list in points:
+                input_arr = np.asarray(points_list)
+                input_arr = np.expand_dims(input_arr, 0)
+                probs = session.run([self.probs],
+                                                       feed_dict={self.inputs: input_arr,
+                                                                  self.seq_len: [len(points_list)]})
+                probs_list.append(probs)
+        return np.asarray(probs_list)
 
 
     def label(self, points, model_name:str, model_dir:str, symbolic=False):
@@ -89,7 +113,6 @@ class LSTMDecoder:
             epoch_error = 0  # Средняя ошибка по всем батчам в данной эпохе
             edit_dist=0#По расстоянию редактирования
             can_output=output_training and (i%output_period==0 or i==num_epochs-1)
-            self.batch_size = 2
             for j in np.arange(0, num_words, self.batch_size):  # Цикл по всем словам, берем по batch_size слов
                 j1 = j
                 j2 = j1 + self.batch_size
@@ -106,15 +129,21 @@ class LSTMDecoder:
                     #batch_labels.append(w.labels_list)
                     batch_labels.append(one_hot_labels)
                 inputs_arr = np.asarray(batch_inputs)
-                targets_array = np.asarray(batch_labels)#TODO:Преобразовать метку в вектор вероятностей(1.0-в позиции с номером класса, остадьные-0)
+                targets_array = np.asarray(batch_labels)
                 #targets_array = sparse_tuple_from(targets_array)
                 #targets_array=np.reshape(targets_array,newshape=(-1,self.batch_size,self.num_classes)
                 
                 #targets_sparse_tensor=tf.SparseTensor(targets_array[0],targets_array[1],targets_array[2])
-                s, loss, logits,probs, ler, decoded_integers,targets,_ = session.run([self.cost, self.loss, self.logits, self.probs, self.ler, self.decoded_integers, self.targets, self.train_fn],
-                                                                             feed_dict={self.inputs: inputs_arr, self.targets: targets_array,
-                                                                 self.seq_len: seq_length})
+                #s, loss, logits,probs, ler, decoded_integers,targets,_ = session.run([self.cost, self.loss, self.logits, self.probs, self.ler, self.decoded_integers, self.targets, self.train_fn],
+                 #                                                            feed_dict={self.inputs: inputs_arr, self.targets: targets_array,
+                 #                                                self.seq_len: seq_length})
                 #indices=np.asarray(decoded_integers.indices)
+                loss,cost,_=session.run([self.loss,self.cost,self.train_fn],feed_dict={self.inputs: inputs_arr, self.targets: targets_array,
+                                                                 self.seq_len: seq_length})
+
+                if can_output:
+                    print("batch cost:",cost)
+                """
                 if can_output:
                     target_values = np.asarray(decoded_integers.values)
                     char_decoded=self.alphabet.decode_numeric_labels(target_values)
@@ -126,7 +155,7 @@ class LSTMDecoder:
                 epoch_error += s
             epoch_error /= num_words
             edit_dist/=num_words
-
+"""
             elapsed_time=time.time()-start_time
 
             if i%output_period==0 or i==num_epochs-1:
@@ -191,7 +220,7 @@ class LSTMDecoder:
 
         #self.targets = tf.sparse_placeholder(tf.int32)
         #self.targets=tf.placeholder(tf.int32,[None,batch_size])
-        self.targets=tf.placeholder(tf.float32,shape=[None,self.batch_size,self.num_classes],name='targets')
+        self.targets=tf.placeholder(tf.float32,shape=[self.batch_size,None,self.num_classes],name='targets')
         self.cells_stack = tf.contrib.rnn.MultiRNNCell([self.lstm_cell() for _ in range(self.num_layers)],
                                                        state_is_tuple=True)
 
@@ -222,8 +251,8 @@ class LSTMDecoder:
 
         # Time major
 
-        self.logits = tf.transpose(self.logits, (1, 0, 2))#Shape: [seq_length,batch_size,num_classes]
-        self.probs=tf.nn.softmax(self.logits)#вероятность для [t,batch_num,class_num]
+        #self.logits = tf.transpose(self.logits, (1, 0, 2))#Shape: [seq_length,batch_size,num_classes]
+        self.probs=tf.nn.softmax(self.logits)#вероятность для [batch_num,t,class_num]
         #self.loss = tf.nn.ctc_loss(self.targets, self.logits, self.seq_len,preprocess_collapse_repeated=False,ctc_merge_repeated=False)
 
         self.loss=tf.nn.sigmoid_cross_entropy_with_logits(labels=self.targets,logits=self.logits)
@@ -234,8 +263,9 @@ class LSTMDecoder:
         self.train_fn = tf.train.MomentumOptimizer(self.learning_rate,
                                                    0.99).minimize(self.cost)
         #self.decoded, self.log_prob = tf.nn.ctc_greedy_decoder(self.logits, self.seq_len,merge_repeated=False)
-        self.decoded, self.log_prob = tf.nn.ctc_greedy_decoder(self.logits, self.seq_len,merge_repeated=False)
-        self.decoded_integers=tf.cast(self.decoded[0], tf.int32)
+        #self.decoded, self.log_prob = tf.nn.ctc_greedy_decoder(self.logits, self.seq_len,merge_repeated=False)
+
+        #self.decoded_integers=tf.cast(self.decoded[0], tf.int32)
         self.ler=-1
         #self.ler = tf.reduce_mean(tf.edit_distance(self.decoded_integers, self.targets))
         pass
