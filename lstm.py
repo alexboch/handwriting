@@ -49,8 +49,8 @@ class LSTMDecoder:
                 probs = session.run([self.probs],
                                                        feed_dict={self.inputs: input_arr,
                                                                   self.seq_len: [len(points_list)]})
-                probs_list.append(probs)
-        return np.asarray(probs_list)
+                probs_list.append(probs[0])
+        return probs_list
 
 
     def label(self, points, model_name:str, model_dir:str, symbolic=False):
@@ -89,7 +89,7 @@ class LSTMDecoder:
     def one_hot(labels,num_classes):
         one_hot_labels=[]
         for label in labels:
-            vector=[0]*num_classes
+            vector=[0.0]*num_classes
             vector[label]=1.0
             one_hot_labels.append(vector)
         return one_hot_labels
@@ -138,7 +138,7 @@ class LSTMDecoder:
                  #                                                            feed_dict={self.inputs: inputs_arr, self.targets: targets_array,
                  #                                                self.seq_len: seq_length})
                 #indices=np.asarray(decoded_integers.indices)
-                loss,cost,_=session.run([self.loss,self.cost,self.train_fn],feed_dict={self.inputs: inputs_arr, self.targets: targets_array,
+                loss,cost,probs,_=session.run([self.loss,self.cost,self.probs,self.train_fn],feed_dict={self.inputs: inputs_arr, self.targets: targets_array,
                                                                  self.seq_len: seq_length})
 
                 if can_output:
@@ -252,7 +252,7 @@ class LSTMDecoder:
         # Time major
 
         #self.logits = tf.transpose(self.logits, (1, 0, 2))#Shape: [seq_length,batch_size,num_classes]
-        self.probs=tf.nn.softmax(self.logits)#вероятность для [batch_num,t,class_num]
+        self.probs=tf.nn.softmax(self.logits,name='probs')#вероятность для [batch_num,t,class_num]
         #self.loss = tf.nn.ctc_loss(self.targets, self.logits, self.seq_len,preprocess_collapse_repeated=False,ctc_merge_repeated=False)
 
         self.loss=tf.nn.sigmoid_cross_entropy_with_logits(labels=self.targets,logits=self.logits)

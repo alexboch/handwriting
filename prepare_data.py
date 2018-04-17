@@ -25,7 +25,7 @@ class LabelsAlphabet:
     def one_hot(self,labels):
         one_hot_labels=[]
         for label in labels:
-            vector=[0]*self.num_chars
+            vector=[0.0]*self.num_chars
             vector[label]=1.0
             one_hot_labels.append(vector)
         return one_hot_labels
@@ -50,7 +50,6 @@ class WordData:#TODO:Добавить координаты точек
     """
     Класс слова, содержащий список точек и меток
     """
-    
     def __init__(self):
         self.point_list=[]
         self.labels_list=[]
