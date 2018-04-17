@@ -61,6 +61,15 @@ class LSTMDecoder:
 
     TINY = 1e-6  # to avoid NaNs in logs
 
+    @staticmethod
+    def one_hot(labels,num_classes):
+        one_hot_labels=[]
+        for label in labels:
+            vector=[0]*num_classes
+            vector[label]=1.0
+            one_hot_labels.append(vector)
+        return one_hot_labels
+
     def train(self, words, num_epochs=100, output_training=False, model_name="model",model_dir_path=f"Models{os.sep}model",):
         """
         words--Список слов, содержащих точки и метки
@@ -93,7 +102,9 @@ class LSTMDecoder:
                 for w in batch_words:
                     batch_inputs.append(w.point_list)
                     seq_length.append(len(w.point_list))  # Присоединяем длину последовательности точек
-                    batch_labels.append(w.labels_list)
+                    one_hot_labels=LSTMDecoder.one_hot(w.labels_list,self.num_classes)
+                    #batch_labels.append(w.labels_list)
+                    batch_labels.append(one_hot_labels)
                 inputs_arr = np.asarray(batch_inputs)
                 targets_array = np.asarray(batch_labels)#TODO:Преобразовать метку в вектор вероятностей(1.0-в позиции с номером класса, остадьные-0)
                 #targets_array = sparse_tuple_from(targets_array)
