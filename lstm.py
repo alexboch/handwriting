@@ -110,7 +110,7 @@ class LSTMDecoder:
         for i in np.arange(num_epochs):
             #print("Epoch number ", str(i))
             np.random.shuffle(words)
-            epoch_error = 0  # Средняя ошибка по всем батчам в данной эпохе
+            epoch_cost = 0  # Средняя ошибка по всем батчам в данной эпохе
             edit_dist=0#По расстоянию редактирования
             can_output=output_training and (i%output_period==0 or i==num_epochs-1)
             for j in np.arange(0, num_words, self.batch_size):  # Цикл по всем словам, берем по batch_size слов
@@ -140,9 +140,10 @@ class LSTMDecoder:
                 #indices=np.asarray(decoded_integers.indices)
                 loss,cost,probs,_=session.run([self.loss,self.cost,self.probs,self.train_fn],feed_dict={self.inputs: inputs_arr, self.targets: targets_array,
                                                                  self.seq_len: seq_length})
-
+                epoch_cost+=cost
                 if can_output:
-                    print("batch cost:",cost)
+                    print("batch cost:",cost," Epoch:",i)
+
                 """
                 if can_output:
                     target_values = np.asarray(decoded_integers.values)
@@ -152,23 +153,24 @@ class LSTMDecoder:
                     print('edit distance error:', ler)
 
                 edit_dist+=ler
-                epoch_error += s
-            epoch_error /= num_words
+                epoch_cost += s
+           
             edit_dist/=num_words
 """
+            epoch_cost /= num_words
             elapsed_time=time.time()-start_time
 
             if i%output_period==0 or i==num_epochs-1:
                 if output_training:
                     print("Epoch number:",i)
-                    print("Epoch error:", epoch_error)
+                    print("Epoch error:", epoch_cost)
                     print(f"Edit distance:{edit_dist}")
                     print(f"Time:{elapsed_time}")
-                epoch_errors.append({"Epoch":i,"Error":epoch_error,"Edit distance":edit_dist,"Time":elapsed_time})
+                epoch_errors.append({"Epoch":i,"Error":epoch_cost,"Edit distance":edit_dist,"Time":elapsed_time})
 
-        for epoch_error in epoch_errors:
-            for k,v in epoch_error.items():
-                epoch_error[k]=str(v).replace('.',',')#Заменить на запятую, чтобы excel понимал
+        for epoch_cost in epoch_errors:
+            for k,v in epoch_cost.items():
+                epoch_cost[k]=str(v).replace('.',',')#Заменить на запятую, чтобы excel понимал
         #Вывод в csv-файл
         headers=['Epoch','Error','Edit distance',"Time"]
 

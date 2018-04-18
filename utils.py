@@ -42,6 +42,38 @@ def getListSeparator():
     return val
 
 
+
+def decode_framewise(probabilities):
+    """
+
+    :param probabilities:Список/массив, элементом является список/массив вероятностей
+    размерности 2: 0-й эл-т--это вероятность границы, 1-й эл-т--вероятность не-границы
+    :return:Список индексов класса для всех моментов времени
+    """
+    max_t=len(probabilities[0])
+    p=probabilities
+    d=np.zeros(shape=(2,max_t))#Массив из нулей
+    for t in np.arange(max_t):#Заполнение матрицы
+        if t==0:
+            d[1][t]=p[1][0]
+            d[0][t]=p[0][0]
+        else:
+            d[0][t]=d[1][t-1]*p[0][t]
+            d[1][t]=max(d[1][t-1],d[0][t-1])*p[1][t]
+    #Восстановление пути
+    class_numbers=[]
+    class_index=np.argmax(d[:,max_t-1])
+    class_numbers.append(class_index)
+    for t in range(max_t-2,-1,-1):
+        if class_index==0:#Если граница, можем переходить только на не-границу(индекс 1)
+            class_index=1
+        else:
+            class_index=np.argmax(d[:,t])#Иначе выбираем, где макс. вероятность
+        class_numbers.append(class_index)
+    class_numbers.reverse()
+    return class_numbers
+
+
 def download_progress_hook(count, blockSize, totalSize):
     """A hook to report the progress of a download. This is mostly intended for
     users with slow internet connections. Reports every 1% change in download

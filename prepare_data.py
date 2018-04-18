@@ -22,6 +22,7 @@ class LabelsAlphabet:
 
 
 
+
     def one_hot(self,labels):
         one_hot_labels=[]
         for label in labels:
