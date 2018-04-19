@@ -43,7 +43,7 @@ class Trainer:
         return self.network.label(points,model_dir='D:\Projects\Python\handwriting\Data\BORDERS\\',model_name='BORDERS')
         #return [self.network.label([word.point_list])[0] for word in words_list]
 
-    def run_training(self,validate=False):
+    def run_training(self, test=False):
         self.load_data()
         training_data=self.data_loader.get_words_list()
         #points = [word.point_list for word in training_data]
@@ -53,18 +53,18 @@ class Trainer:
         target_labels = [word.labels_list for word in training_data]
         #self.network.label(points, path_to_model='D:\Projects\Python\handwriting\Data\BORDERS\BORDERS',model_dir='D:\Projects\Python\handwriting\Data\BORDERS\\')
         data_len=len(training_data)
-        validate=validate and data_len>1
-        if validate:
+        test= test and data_len > 1
+        if test:
             np.random.shuffle(training_data)
             # Разделить на валидационное и тренировочное множества в отношении 20 на 80
-            valid_len=int(data_len*0.2)#20% на валидацию
-            train_len=data_len-valid_len#80 на обучение
-            validation_data=training_data[:valid_len]
-            training_data=training_data[valid_len:]
+            test_len=int(data_len * 0.2)#20% на тест
+            train_len= data_len - test_len#80 на обучение
+            test_data= training_data[:test_len]
+            training_data= training_data[test_len:]
 
         train_stat=self.train_network(training_data)
 
-        if validate:
+        if test:
             #decoded_labels_list=self.get_labels_for_list(validation_data)
             #target_labels_list=[word.labels_list for word in validation_data]
 

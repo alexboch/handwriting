@@ -2,6 +2,7 @@ import numpy as np
 import tensorflow as tf
 import csv
 import time
+import traceback
 import os
 from prepare_data import DataHelper
 from utils import *
@@ -94,7 +95,27 @@ class LSTMDecoder:
             one_hot_labels.append(vector)
         return one_hot_labels
 
-    def train(self, words, num_epochs=100, output_training=False, model_name="model",model_dir_path=f"Models{os.sep}model",):
+
+    def prepare_batch(self,batch_words):
+        """
+
+        :param batch_words:слова батча
+        :return:inputs_array,targets_array,seq_lengths
+        """
+        batch_inputs=[]
+        seq_lengths=[]
+        batch_labels=[]
+        for w in batch_words:
+            batch_inputs.append(w.point_list)
+            seq_lengths.append(len(w.point_list))  # Присоединяем длину последовательности точек
+            # one_hot_labels=LSTMDecoder.one_hot(w.labels_list,self.num_classes)
+            batch_labels.append(w.labels_list)
+            # batch_labels.append(one_hot_labels)
+        inputs_arr = np.asarray(batch_inputs)
+        targets_array = np.asarray(batch_labels)
+        return inputs_arr, targets_array,seq_lengths
+
+    def train(self, words, num_epochs=100, output_training=False, model_name="model",model_dir_path=f"Models{os.sep}model",validate=True):
         """
         words--Список слов, содержащих точки и метки
         """
@@ -106,32 +127,59 @@ class LSTMDecoder:
         output_period=max(num_epochs/100.0*5,1)#Выводить каждый раз, когда прошло 5% обучения
         epoch_errors=[]
         start_time=time.time()
+
         """
         Создать слова с one-hot метками
         """
         one_hot_words=list(words)
         for w in one_hot_words:
             w.labels_list=LSTMDecoder.one_hot(w.labels_list,self.num_classes)
-        for i in np.arange(num_epochs):
-            #print("Epoch number ", str(i))
-            np.random.shuffle(words)
-            train_epoch_cost = 0  # Средняя ошибка по всем батчам в данной эпохе
-            edit_dist=0#По расстоянию редактирования
-            train_epoch_norm_norm=0
-            train_epoch_norm=0
-            can_output=output_training and (i%output_period==0 or i==num_epochs-1)
-            for j in np.arange(0, num_words, self.batch_size):  # Цикл по всем словам, берем по batch_size слов
+        data_len=len(one_hot_words)
+        train_len=data_len#Если нет валидации, берем весь массив слов
+        valid_len=0
+        validate=validate and data_len>1#Если слово только 1, то валидацию следать не сможем
+        if data_len<1:
+            print("Dataset is too small to partition to test and validation sets!")
+        if validate:
+            np.random.shuffle(one_hot_words)
+            #valid_len=int(data_len*0.2)#Количество слов для валидации--20% от общего
+            #train_len=data_len-valid_len
+            train_len=int(data_len*0.8)
+
+            validation_data=one_hot_words[train_len:]
+            validation_feeds=[]#Список для всех батчей валидации
+            #Создать батчи для валидации
+            for j in np.arange(0, len(validation_data),
+                               self.batch_size):  # Цикл по всем тренировочным словам, берем по batch_size слов, составляем батчи для тренировки
                 j1 = j
                 j2 = j1 + self.batch_size
-                batch_words = one_hot_words[j:j2]  # слова для создания батча
+                validation_batch_words = validation_data[j:j2]  # слова для создания батча
+                validation_feeds.append(self.prepare_batch(validation_batch_words))#Присоединяем (inputs_array,targets_array,sequence_lengths)
+        training_data = one_hot_words[:train_len]
+
+
+        for i in np.arange(num_epochs):
+            #print("Epoch number ", str(i))
+            epoch_errors_data=dict()
+
+            np.random.shuffle(words)#
+            train_epoch_cost = 0  # Средняя ошибка по всем батчам в данной эпохе
+            edit_dist=0#По расстоянию редактирования
+            train_epoch_nn=0
+            train_epoch_norm=0
+            can_output=output_training and (i%output_period==0 or i==num_epochs-1)
+            for j in np.arange(0, len(training_data), self.batch_size):  # Цикл по всем тренировочным словам, берем по batch_size слов, составляем батчи для тренировки
+                j1 = j
+                j2 = j1 + self.batch_size
+                batch_words = training_data[j:j2]  # слова для создания батча
                 batch_inputs = []
                 batch_labels = []
-                seq_length = []  # Вектор длин каждой последовательности
+                seq_lengths = []  # Вектор длин каждой последовательности
 
                 # получить список точек и меток
                 for w in batch_words:
                     batch_inputs.append(w.point_list)
-                    seq_length.append(len(w.point_list))  # Присоединяем длину последовательности точек
+                    seq_lengths.append(len(w.point_list))  # Присоединяем длину последовательности точек
                     #one_hot_labels=LSTMDecoder.one_hot(w.labels_list,self.num_classes)
                     batch_labels.append(w.labels_list)
                     #batch_labels.append(one_hot_labels)
@@ -145,58 +193,84 @@ class LSTMDecoder:
                  #                                                            feed_dict={self.inputs: inputs_arr, self.targets: targets_array,
                  #                                                self.seq_len: seq_length})
                 #indices=np.asarray(decoded_integers.indices)
-
-                loss, train_cost, probs, normalized_batch_norm, train_batch_norm, _=session.run([self.loss, self.cost, self.probs, self.normalized_norm, self.norm, self.train_fn], feed_dict={self.inputs: inputs_arr, self.targets: targets_array,
-                                                                                                                                                                                         self.seq_len: seq_length})
+                #Подаем батч на вход и получаем результат
+                loss, train_cost, probs, normalized_batch_norm, train_batch_norm, _=session.run([self.loss, self.cost, self.probs, self.normalized_norm, self.norm, self.train_fn],
+                                                                                                feed_dict={self.inputs: inputs_arr, self.targets: targets_array, self.seq_len: seq_lengths})
                 train_epoch_cost+=train_cost
-                train_epoch_norm_norm+=normalized_batch_norm
+                train_epoch_nn+=normalized_batch_norm
                 train_epoch_norm+=train_batch_norm
-
-                #validation_cost
-
 
                 if can_output:
                     print("batch cost:",train_cost," Epoch:",i)
                     print("batch norm:", train_batch_norm)
                     print("normalized batch norm:",normalized_batch_norm)
-                """
-                if can_output:
-                    target_values = np.asarray(decoded_integers.values)
-                    char_decoded=self.alphabet.decode_numeric_labels(target_values)
-                    print("Decoded chars:",char_decoded)
-                    print('batch loss:', loss)
-                    print('edit distance error:', ler)
 
-                edit_dist+=ler
-                train_epoch_cost += s
-           
-            edit_dist/=num_words
-"""
-            """Конец эпохи"""
-            train_epoch_cost /= num_words
+            """Конец эпохи(Прошли весь тренировочный датасет)"""
+            #Валидация
+            if validate:
+                validation_epoch_norm=0#Среднее значение нормы на эпохе для датасета валидации
+                validation_epoch_nn=0
+                validation_epoch_cost=0
+                for valid_feed in validation_feeds:#Для каждого батча валидации
+                    validation_cost,validation_nn,validation_norm=session.run([self.cost,self.normalized_norm,self.norm],
+                                                                              feed_dict={self.inputs:valid_feed[0],self.targets:valid_feed[1],self.seq_len:valid_feed[2]})
+                    validation_epoch_norm+=validation_norm
+                    validation_epoch_nn+=validation_nn
+                    validation_epoch_cost+=validation_cost
+
+                val_feeds_len=len(validation_feeds)
+                validation_epoch_norm/=val_feeds_len
+                validation_epoch_cost/=val_feeds_len
+                validation_epoch_nn/=val_feeds_len
+                epoch_errors_data["Validation norm"]=validation_epoch_norm
+                epoch_errors_data["Validation cost"]=validation_epoch_cost
+                epoch_errors_data["Validation normalized distance"]=validation_epoch_nn
+                if i % output_period == 0 or i == num_epochs - 1:
+                    if output_training:
+                        print("On validation set:")
+                        print("Epoch number:", i)
+                        print("Epoch cost:", validation_epoch_cost)
+                        print("Epoch norm:", validation_epoch_norm)
+                        print("Epoch normalized distance:",validation_epoch_nn)
+            train_epoch_cost /= train_len
+            train_epoch_norm/=train_len
+            train_epoch_nn/=train_len
+
             elapsed_time=time.time()-start_time
-
             if i%output_period==0 or i==num_epochs-1:
                 if output_training:
+                    print("On training set:")
                     print("Epoch number:",i)
-                    print("Epoch error:", train_epoch_cost)
+                    print("Epoch cost:", train_epoch_cost)
                     print(f"Epoch norm:{train_epoch_norm}")
+                    print(f"Epoch normalized distance{train_epoch_nn}")
                     print(f"Time:{elapsed_time}")
-                epoch_errors.append({"Epoch":i,"Error":train_epoch_cost,"Edit distance":edit_dist,"Time":elapsed_time})
+                #epoch_errors.append({"Epoch":i,"Error":train_epoch_cost,"Edit distance":edit_dist,"Time":elapsed_time})
+                epoch_errors_data["Train norm"]=train_epoch_norm
+                epoch_errors_data["Epoch normalized distance"]=train_epoch_nn
+                epoch_errors_data["Train cost"] = train_epoch_cost
+                epoch_errors_data["Time"]=elapsed_time
+                epoch_errors_data["Epoch"]=i
+                epoch_errors.append(epoch_errors_data)
 
         for train_epoch_cost in epoch_errors:
             for k,v in train_epoch_cost.items():
                 train_epoch_cost[k]=str(v).replace('.',',')#Заменить на запятую, чтобы excel понимал
         #Вывод в csv-файл
-        headers=['Epoch','Error','Edit distance',"Time"]
+        #headers=['Epoch','Error','Edit distance',"Time"]
 
         self._csv_path=os.path.join(model_dir_path,f"{model_name}.csv")
         if not os.path.exists(model_dir_path):
             os.makedirs(model_dir_path)#Создать папку модели, если она не существует
         with open(self._csv_path, 'w+',newline='') as csvfile:
             sep=getListSeparator()#Получить разделитель для текущих настроек локали
+            headers=[]
+            if len(epoch_errors)>0:
+                headers=list(epoch_errors[0].keys())
             csvwriter=csv.DictWriter(csvfile,fieldnames=headers,delimiter=sep)
+
             csvwriter.writeheader()
+
             for i in np.arange(len(epoch_errors)):
                 data=epoch_errors[i]
                 csvwriter.writerow(data)#Записать строку в csv

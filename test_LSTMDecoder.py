@@ -17,6 +17,7 @@ class TestLSTMDecoder(TestCase):
             train_word.point_list.extend([(1, 1), (0, 0), (-1, 1), (0, 0.1)])
 
             train_word.labels_list.extend(['а', 'и', 'а', 'и'])
+
             train_word.labels_list = full_alphabet.encode_char_labels(train_word.labels_list)
             model_path="Models\\small_test2\\"+datetime.now().strftime('%d-%m-%Y-%I_%M_%S')
             ld.train([train_word], 50, True, model_name="small_test",model_dir_path=model_path)
@@ -38,6 +39,7 @@ class TestLSTMDecoder(TestCase):
             print(f"Error:{err}")
         except Exception as exc:
             print(exc)
+            self.fail()
         pass
         #labels = ld.label([test_word.point_list], model_name='small_test',model_dir="Models\\small_test\\")
         #char_labels = full_alphabet.decode_numeric_labels(labels)
