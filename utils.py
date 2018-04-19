@@ -13,6 +13,10 @@ from winreg import *
 url = 'https://catalog.ldc.upenn.edu/desc/addenda/'
 last_percent_reported = None
 
+def normalized_frobenius(arr1,arr2):
+    diff=arr1-arr2
+    err=np.linalg.norm(diff)
+
 
 def levenshtein(s1, s2):
     if len(s1) < len(s2):

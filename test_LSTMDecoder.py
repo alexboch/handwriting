@@ -18,8 +18,8 @@ class TestLSTMDecoder(TestCase):
 
             train_word.labels_list.extend(['а', 'и', 'а', 'и'])
             train_word.labels_list = full_alphabet.encode_char_labels(train_word.labels_list)
-            model_path="Models\\small_test2\\"+datetime.now().strftime('%d-%m-%Y-%I_%m_%S')
-            ld.train([train_word], 750, True, model_name="small_test",model_dir_path=model_path)
+            model_path="Models\\small_test2\\"+datetime.now().strftime('%d-%m-%Y-%I_%M_%S')
+            ld.train([train_word], 50, True, model_name="small_test",model_dir_path=model_path)
             test_word = prepdata.WordData()
             test_word.point_list.extend([(0, 0), (-1, 0.99)])
             test_word.labels_list.extend(['и', 'а'])
@@ -30,7 +30,11 @@ class TestLSTMDecoder(TestCase):
             probs=ld.get_probabilities([test_word.point_list],model_name='small_test',model_dir=model_path)
             #probs[0][0].shape == np.asarray(true_probs).shape
             true_probs_arr=np.asarray(true_probs)
-            err=np.linalg.norm(probs[0][0] - true_probs_arr)#Разница между вероятностями по Евклидовой метрике
+            diff=probs[0][0]-true_probs_arr
+
+            err=np.linalg.norm(diff)#Разница между вероятностями по норме Фробениуса
+            max_norm=np.sqrt(diff.shape[0]*diff.shape[1])
+            err/=max_norm
             print(f"Error:{err}")
         except Exception as exc:
             print(exc)

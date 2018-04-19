@@ -106,17 +106,24 @@ class LSTMDecoder:
         output_period=max(num_epochs/100.0*5,1)#Выводить каждый раз, когда прошло 5% обучения
         epoch_errors=[]
         start_time=time.time()
-        prev_epoch_time=start_time
+        """
+        Создать слова с one-hot метками
+        """
+        one_hot_words=list(words)
+        for w in one_hot_words:
+            w.labels_list=LSTMDecoder.one_hot(w.labels_list,self.num_classes)
         for i in np.arange(num_epochs):
             #print("Epoch number ", str(i))
             np.random.shuffle(words)
-            epoch_cost = 0  # Средняя ошибка по всем батчам в данной эпохе
+            train_epoch_cost = 0  # Средняя ошибка по всем батчам в данной эпохе
             edit_dist=0#По расстоянию редактирования
+            train_epoch_norm_norm=0
+            train_epoch_norm=0
             can_output=output_training and (i%output_period==0 or i==num_epochs-1)
             for j in np.arange(0, num_words, self.batch_size):  # Цикл по всем словам, берем по batch_size слов
                 j1 = j
                 j2 = j1 + self.batch_size
-                batch_words = words[j:j2]  # слова для создания батча
+                batch_words = one_hot_words[j:j2]  # слова для создания батча
                 batch_inputs = []
                 batch_labels = []
                 seq_length = []  # Вектор длин каждой последовательности
@@ -125,9 +132,9 @@ class LSTMDecoder:
                 for w in batch_words:
                     batch_inputs.append(w.point_list)
                     seq_length.append(len(w.point_list))  # Присоединяем длину последовательности точек
-                    one_hot_labels=LSTMDecoder.one_hot(w.labels_list,self.num_classes)
-                    #batch_labels.append(w.labels_list)
-                    batch_labels.append(one_hot_labels)
+                    #one_hot_labels=LSTMDecoder.one_hot(w.labels_list,self.num_classes)
+                    batch_labels.append(w.labels_list)
+                    #batch_labels.append(one_hot_labels)
                 inputs_arr = np.asarray(batch_inputs)
                 targets_array = np.asarray(batch_labels)
                 #targets_array = sparse_tuple_from(targets_array)
@@ -138,12 +145,20 @@ class LSTMDecoder:
                  #                                                            feed_dict={self.inputs: inputs_arr, self.targets: targets_array,
                  #                                                self.seq_len: seq_length})
                 #indices=np.asarray(decoded_integers.indices)
-                loss,cost,probs,_=session.run([self.loss,self.cost,self.probs,self.train_fn],feed_dict={self.inputs: inputs_arr, self.targets: targets_array,
-                                                                 self.seq_len: seq_length})
-                epoch_cost+=cost
-                if can_output:
-                    print("batch cost:",cost," Epoch:",i)
 
+                loss, train_cost, probs, normalized_batch_norm, train_batch_norm, _=session.run([self.loss, self.cost, self.probs, self.normalized_norm, self.norm, self.train_fn], feed_dict={self.inputs: inputs_arr, self.targets: targets_array,
+                                                                                                                                                                                         self.seq_len: seq_length})
+                train_epoch_cost+=train_cost
+                train_epoch_norm_norm+=normalized_batch_norm
+                train_epoch_norm+=train_batch_norm
+
+                #validation_cost
+
+
+                if can_output:
+                    print("batch cost:",train_cost," Epoch:",i)
+                    print("batch norm:", train_batch_norm)
+                    print("normalized batch norm:",normalized_batch_norm)
                 """
                 if can_output:
                     target_values = np.asarray(decoded_integers.values)
@@ -153,24 +168,25 @@ class LSTMDecoder:
                     print('edit distance error:', ler)
 
                 edit_dist+=ler
-                epoch_cost += s
+                train_epoch_cost += s
            
             edit_dist/=num_words
 """
-            epoch_cost /= num_words
+            """Конец эпохи"""
+            train_epoch_cost /= num_words
             elapsed_time=time.time()-start_time
 
             if i%output_period==0 or i==num_epochs-1:
                 if output_training:
                     print("Epoch number:",i)
-                    print("Epoch error:", epoch_cost)
-                    print(f"Edit distance:{edit_dist}")
+                    print("Epoch error:", train_epoch_cost)
+                    print(f"Epoch norm:{train_epoch_norm}")
                     print(f"Time:{elapsed_time}")
-                epoch_errors.append({"Epoch":i,"Error":epoch_cost,"Edit distance":edit_dist,"Time":elapsed_time})
+                epoch_errors.append({"Epoch":i,"Error":train_epoch_cost,"Edit distance":edit_dist,"Time":elapsed_time})
 
-        for epoch_cost in epoch_errors:
-            for k,v in epoch_cost.items():
-                epoch_cost[k]=str(v).replace('.',',')#Заменить на запятую, чтобы excel понимал
+        for train_epoch_cost in epoch_errors:
+            for k,v in train_epoch_cost.items():
+                train_epoch_cost[k]=str(v).replace('.',',')#Заменить на запятую, чтобы excel понимал
         #Вывод в csv-файл
         headers=['Epoch','Error','Edit distance',"Time"]
 
@@ -256,8 +272,15 @@ class LSTMDecoder:
         #self.logits = tf.transpose(self.logits, (1, 0, 2))#Shape: [seq_length,batch_size,num_classes]
         self.probs=tf.nn.softmax(self.logits,name='probs')#вероятность для [batch_num,t,class_num]
         #self.loss = tf.nn.ctc_loss(self.targets, self.logits, self.seq_len,preprocess_collapse_repeated=False,ctc_merge_repeated=False)
+        self.diff=tf.subtract(self.probs,self.targets)#Разница между целевыми и вычесленными вероятностями
+        #self.reshaped_diff=tf.reshape(self.diff,[-1])
+        #self.reshaped_diff.
 
-        self.loss=tf.nn.sigmoid_cross_entropy_with_logits(labels=self.targets,logits=self.logits)
+
+        self.sqrt_size=tf.sqrt(tf.cast(tf.size(self.diff),tf.float32),name='sqrt_size')
+        self.norm=tf.norm(self.diff,name='norm')
+        self.normalized_norm=tf.divide(tf.norm(self.diff), self.sqrt_size, name='norm_norm')#Матричная норма, возвращает скаляр
+        self.loss=tf.nn.sigmoid_cross_entropy_with_logits(labels=self.targets,logits=self.logits,name='loss')
         #self.loss=tf.nn.sparse_softmax_cross_entropy_with_logits(labels=self.targets,logits=self.logits,name='loss')
         #self.loss = tf.nn.ctc_loss(self.targets, self.logits, self.seq_len,preprocess_collapse_repeated=False,ctc_merge_repeated=False)
 

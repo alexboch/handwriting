@@ -26,7 +26,7 @@ class Trainer:
     def train_network(self,data=None):
         if data is None:
             data=self.data_loader.get_words_list()
-        model_dir_path_with_datetime=self.model_dir_path+datetime.now().strftime('%d-%m-%Y-%I_%m_%S')
+        model_dir_path_with_datetime=self.model_dir_path+datetime.now().strftime('%d-%m-%Y-%I_%M_%S')
         self.network.train(data,self.num_epochs,self.output_training,self.model_name,model_dir_path_with_datetime)
         pass
 
@@ -65,14 +65,17 @@ class Trainer:
         train_stat=self.train_network(training_data)
 
         if validate:
-            decoded_labels_list=self.get_labels_for_list(validation_data)
-            target_labels_list=[word.labels_list for word in validation_data]
+            #decoded_labels_list=self.get_labels_for_list(validation_data)
+            #target_labels_list=[word.labels_list for word in validation_data]
+
             #validation_error=levenshtein(decoded_labels,target_labels)/(len(target_labels)+len(decoded_labels))#нормализованное расстояние редактирования
             validation_error=0.0
-            for i in range(len(decoded_labels_list)):
+
+            """for i in range(len(decoded_labels_list)):
                 decoded_labels=decoded_labels_list[i]
                 target_labels=target_labels_list[i]
                 validation_error+=levenshtein(decoded_labels,target_labels)/(len(target_labels)+len(decoded_labels))#нормализованное расстояние редактирования
-            validation_error/=len(decoded_labels_list)#Среднее расстояние редактирования по всем спискам точек
+            validation_error/=len(decoded_labels_list)#Среднее расстояние редактирования по всем спискам точек"""
+
             print(f"Validation error:{validation_error}")
         pass
