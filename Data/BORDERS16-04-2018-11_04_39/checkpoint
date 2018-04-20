@@ -1,0 +1,2 @@
+model_checkpoint_path: "BORDERS"
+all_model_checkpoint_paths: "BORDERS"
