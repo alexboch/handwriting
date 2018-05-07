@@ -34,9 +34,12 @@ class GraphHelper:
         input_checkpoint = checkpoint.model_checkpoint_path
 
         # We precise the file fullname of our freezed graph
-        absolute_model_dir = "/".join(input_checkpoint.split('/')[:-1])
-        output_graph = absolute_model_dir + "/frozen_model.pb"
+        #absolute_model_dir = "/".join(input_checkpoint.split('/')[:-1])
+        absolute_model_dir=os.path.sep+os.path.basename(input_checkpoint)
 
+        #output_graph = absolute_model_dir + f"{os.path.sep}frozen_model.pb"
+        #output_graph=os.path.join(absolute_model_dir,"frozen_model.pb")
+        output_graph=os.path.join(model_dir,"frozen_model.pb")
         # We clear devices to allow TensorFlow to control on which device it will load operations
         clear_devices = True
 
@@ -55,8 +58,14 @@ class GraphHelper:
                 output_node_names.split(",")  # The output node names are used to select the usefull nodes
             )
             # Finally we serialize and dump the output graph to the filesystem
-            with tf.gfile.GFile(output_graph, "wb") as f:
-                f.write(output_graph_def.SerializeToString())
+            #with tf.gfile.GFile(output_graph, "wb") as f:
+            #    serialized=output_graph_def.SerializeToString()
+
+             #   f.write(serialized)
+                #f.write(output_graph_def.SerializeToString())
+            with open(output_graph,"w+b") as f:
+                serialized = output_graph_def.SerializeToString()
+                f.write(serialized)
             print("%d ops in the final graph." % len(output_graph_def.node))
         return output_graph_def
 
@@ -77,13 +86,11 @@ class GraphHelper:
 
         return graph
 
-"""
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--model_dir", type=str, default="", help="Model folder to export")
     parser.add_argument("--output_node_names", type=str, default="",
                         help="The name of the output nodes, comma separated.")
     args = parser.parse_args()
-
-GraphHelper.freeze_graph(args.model_dir, args.output_node_names)
-"""
+    GraphHelper.freeze_graph(args.model_dir, args.output_node_names)
