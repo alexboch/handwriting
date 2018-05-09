@@ -22,7 +22,7 @@ class TrainerBuilder:
             self.alphabet=conf.get_alphabet(init_config)
             self.labels_mapper=conf.get_labels_mapper(init_config)
             self.net_config=conf.get_network_config(init_config)
-            self.num_classes=self.alphabet.get_length()+1#Для всех символов + пустая метка
+            self.num_classes=self.alphabet.get_length()#Для всех символов
             self.num_epochs=conf.get_num_epochs(init_config)
             self.network=LSTMDecoder(self.net_config.num_units,self.net_config.num_layers,self.net_config.num_features,self.num_classes,
                                 self.net_config.learning_rate,self.net_config.batch_size,self.alphabet)
