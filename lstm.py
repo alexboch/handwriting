@@ -132,8 +132,8 @@ class LSTMDecoder:
         Создать слова с one-hot метками
         """
         one_hot_words=list(words)
-        for w in one_hot_words:
-            w.labels_list=LSTMDecoder.one_hot(w.labels_list,self.num_classes)
+        #for w in one_hot_words:
+        #    w.labels_list=LSTMDecoder.one_hot(w.labels_list,self.num_classes)
         data_len=len(one_hot_words)
         train_len=data_len#Если нет валидации, берем весь массив слов
         valid_len=0
@@ -193,17 +193,19 @@ class LSTMDecoder:
                  #                                                            feed_dict={self.inputs: inputs_arr, self.targets: targets_array,
                  #                                                self.seq_len: seq_length})
                 #indices=np.asarray(decoded_integers.indices)
+                #веса точек TODO:Переделать, чтобы передавались извне
+                #TODO:Посчитать веса
                 #Подаем батч на вход и получаем результат
-                loss, train_cost, probs, normalized_batch_norm, train_batch_norm, _=session.run([self.loss, self.cost, self.probs, self.normalized_norm, self.norm, self.train_fn],
-                                                                                                feed_dict={self.inputs: inputs_arr, self.targets: targets_array, self.seq_len: seq_lengths})
-                train_epoch_cost+=train_cost
-                train_epoch_nn+=normalized_batch_norm
-                train_epoch_norm+=train_batch_norm
+                loss, probs,_=session.run([self.loss, self.probs,  self.train_fn],
+                                          feed_dict={self.inputs: inputs_arr, self.targets: targets_array,self.entropy_weights: self.seq_len: seq_lengths})
+                #train_epoch_cost+=train_cost
+                #train_epoch_nn+=normalized_batch_norm
+                #train_epoch_norm+=train_batch_norm
 
-                if can_output:
-                    print("batch cost:",train_cost," Epoch:",i)
-                    print("batch norm:", train_batch_norm)
-                    print("normalized batch norm:",normalized_batch_norm)
+                #if can_output:
+                    #print("batch cost:",train_cost," Epoch:",i)
+                    #print("batch norm:", train_batch_norm)
+                    #print("normalized batch norm:",normalized_batch_norm)
 
             """Конец эпохи(Прошли весь тренировочный датасет)"""
             #Валидация
@@ -212,11 +214,11 @@ class LSTMDecoder:
                 validation_epoch_nn=0
                 validation_epoch_cost=0
                 for valid_feed in validation_feeds:#Для каждого батча валидации
-                    validation_cost,validation_nn,validation_norm=session.run([self.cost,self.normalized_norm,self.norm],
+                    validation_loss,validation_nn=session.run([self.loss],
                                                                               feed_dict={self.inputs:valid_feed[0],self.targets:valid_feed[1],self.seq_len:valid_feed[2]})
-                    validation_epoch_norm+=validation_norm
-                    validation_epoch_nn+=validation_nn
-                    validation_epoch_cost+=validation_cost
+                    #validation_epoch_norm+=validation_norm
+                    #validation_epoch_nn+=validation_nn
+                    #validation_epoch_cost+=validation_cost
 
                 val_feeds_len=len(validation_feeds)
                 validation_epoch_norm/=val_feeds_len
@@ -312,7 +314,7 @@ class LSTMDecoder:
 
         #self.targets = tf.sparse_placeholder(tf.int32)
         #self.targets=tf.placeholder(tf.int32,[None,batch_size])
-        self.targets=tf.placeholder(tf.float32,shape=[self.batch_size,None,self.num_classes],name='targets')
+        self.targets=tf.placeholder(tf.int32,shape=[self.batch_size,None],name='targets')
         self.cells_stack = tf.contrib.rnn.MultiRNNCell([self.lstm_cell() for _ in range(self.num_layers)],
                                                        state_is_tuple=True)
 
@@ -346,21 +348,23 @@ class LSTMDecoder:
         #self.logits = tf.transpose(self.logits, (1, 0, 2))#Shape: [seq_length,batch_size,num_classes]
         self.probs=tf.nn.softmax(self.logits,name='probs')#вероятность для [batch_num,t,class_num]
         #self.loss = tf.nn.ctc_loss(self.targets, self.logits, self.seq_len,preprocess_collapse_repeated=False,ctc_merge_repeated=False)
-        self.diff=tf.subtract(self.probs,self.targets)#Разница между целевыми и вычесленными вероятностями
+        #self.diff=tf.subtract(self.probs,self.targets)#Разница между целевыми и вычесленными вероятностями
         #self.reshaped_diff=tf.reshape(self.diff,[-1])
         #self.reshaped_diff.
 
 
-        self.sqrt_size=tf.sqrt(tf.cast(tf.size(self.diff),tf.float32),name='sqrt_size')
-        self.norm=tf.norm(self.diff,name='norm')
-        self.normalized_norm=tf.divide(tf.norm(self.diff), self.sqrt_size, name='norm_norm')#Матричная норма, возвращает скаляр
-        self.loss=tf.nn.sigmoid_cross_entropy_with_logits(labels=self.targets,logits=self.logits,name='loss')
+        #self.sqrt_size=tf.sqrt(tf.cast(tf.size(self.diff),tf.float32),name='sqrt_size')
+        #self.norm=tf.norm(self.diff,name='norm')
+        #self.normalized_norm=tf.divide(tf.norm(self.diff), self.sqrt_size, name='norm_norm')#Матричная норма, возвращает скаляр
+        #self.loss=tf.nn.sigmoid_cross_entropy_with_logits(labels=self.targets,logits=self.logits,name='loss')
+        self.entropy_weights=tf.placeholder(tf.float32, [self.batch_size, None], 'entropy_weights')
+        self.loss=tf.contrib.seq2seq.sequence_loss(self.logits, self.targets, self.entropy_weights)
         #self.loss=tf.nn.sparse_softmax_cross_entropy_with_logits(labels=self.targets,logits=self.logits,name='loss')
         #self.loss = tf.nn.ctc_loss(self.targets, self.logits, self.seq_len,preprocess_collapse_repeated=False,ctc_merge_repeated=False)
 
-        self.cost = tf.reduce_mean(self.loss)
+        #self.cost = tf.reduce_mean(self.loss)
         self.train_fn = tf.train.MomentumOptimizer(self.learning_rate,
-                                                   0.99).minimize(self.cost)
+                                                   0.99).minimize(self.loss)
         #self.decoded, self.log_prob = tf.nn.ctc_greedy_decoder(self.logits, self.seq_len,merge_repeated=False)
         #self.decoded, self.log_prob = tf.nn.ctc_greedy_decoder(self.logits, self.seq_len,merge_repeated=False)
 
