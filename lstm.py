@@ -11,6 +11,11 @@ import tensorflow.contrib.layers as layers
 map_fn = tf.map_fn
 
 
+class ValFeed:
+    def __init__self(self,points,labels,length,weights):
+
+        pass
+
 class LSTMDecoder:
     """
     Класс для создания, обучения и получения разметки от LSTM-нейросети TODO:Сделать другие варианты клеток, кроме LSTM
@@ -86,34 +91,6 @@ class LSTMDecoder:
 
     TINY = 1e-6  # to avoid NaNs in logs
 
-    @staticmethod
-    def one_hot(labels,num_classes):
-        one_hot_labels=[]
-        for label in labels:
-            vector=[0.0]*num_classes
-            vector[label]=1.0
-            one_hot_labels.append(vector)
-        return one_hot_labels
-
-
-    def prepare_batch(self,batch_words):
-        """
-
-        :param batch_words:слова батча
-        :return:inputs_array,targets_array,seq_lengths
-        """
-        batch_inputs=[]
-        seq_lengths=[]
-        batch_labels=[]
-        for w in batch_words:
-            batch_inputs.append(w.point_list)
-            seq_lengths.append(len(w.point_list))  # Присоединяем длину последовательности точек
-            # one_hot_labels=LSTMDecoder.one_hot(w.labels_list,self.num_classes)
-            batch_labels.append(w.labels_list)
-            # batch_labels.append(one_hot_labels)
-        inputs_arr = np.asarray(batch_inputs)
-        targets_array = np.asarray(batch_labels)
-        return inputs_arr, targets_array,seq_lengths
 
     def train(self, words, num_epochs=100, output_training=False, model_name="model",model_dir_path=f"Models{os.sep}model",validate=True):
         """
@@ -131,85 +108,58 @@ class LSTMDecoder:
         """
         Создать слова с one-hot метками
         """
-        one_hot_words=list(words)
-        #for w in one_hot_words:
-        #    w.labels_list=LSTMDecoder.one_hot(w.labels_list,self.num_classes)
-        data_len=len(one_hot_words)
+        weighted_words=list(words)
+        for word in weighted_words:
+            word.weights=np.ones((self.batch_size,len(word.point_list)),dtype=np.float32)
+            word.length=len(word.point_list)
+        data_len=len(weighted_words)
         train_len=data_len#Если нет валидации, берем весь массив слов
         valid_len=0
         validate=validate and data_len>1#Если слово только 1, то валидацию следать не сможем
         if data_len<1:
             print("Dataset is too small to partition to test and validation sets!")
         if validate:
-            np.random.shuffle(one_hot_words)
-            #valid_len=int(data_len*0.2)#Количество слов для валидации--20% от общего
-            #train_len=data_len-valid_len
+            np.random.shuffle(weighted_words)
             train_len=int(data_len*0.8)
-
-            validation_data=one_hot_words[train_len:]
-            validation_feeds=[]#Список для всех батчей валидации
-            #Создать батчи для валидации
-            for j in np.arange(0, len(validation_data),
-                               self.batch_size):  # Цикл по всем тренировочным словам, берем по batch_size слов, составляем батчи для тренировки
-                j1 = j
-                j2 = j1 + self.batch_size
-                validation_batch_words = validation_data[j:j2]  # слова для создания батча
-                validation_feeds.append(self.prepare_batch(validation_batch_words))#Присоединяем (inputs_array,targets_array,sequence_lengths)
-        training_data = one_hot_words[:train_len]
+            validation_data=weighted_words[train_len:]
+        training_words = weighted_words[:train_len]
 
 
         for i in np.arange(num_epochs):
-            #print("Epoch number ", str(i))
             epoch_errors_data=dict()
-
             np.random.shuffle(words)#
-            train_epoch_cost = 0  # Средняя ошибка по всем батчам в данной эпохе
-            edit_dist=0#По расстоянию редактирования
+            train_epoch_loss = 0  # Средняя ошибка по всем батчам в данной эпохе
             train_epoch_nn=0
             train_epoch_norm=0
             can_output=output_training and (i%output_period==0 or i==num_epochs-1)
-            for j in np.arange(0, len(training_data), self.batch_size):  # Цикл по всем тренировочным словам, берем по batch_size слов, составляем батчи для тренировки
-                # j1 = j
-                # j2 = j1 + self.batch_size
-                batch_word = training_data[j]  # слова для создания батча
+            for j in np.arange(0, len(training_words)):  # Цикл по всем тренировочным словам, берем по 1 слову
+                batch_word = training_words[j]  # слова для создания батча
                 batch_inputs = [batch_word.point_list]
                 batch_labels = [batch_word.labels_list]
-                seq_lengths = [len(batch_word.point_list)]  # Вектор длин каждой последовательности
-
-                # получить список точек и меток
-                # for w in batch_words:
-                #     batch_inputs.append(w.point_list)
-                #     seq_lengths.append(len(w.point_list))  # Присоединяем длину последовательности точек
-                #     #one_hot_labels=LSTMDecoder.one_hot(w.labels_list,self.num_classes)
-                #     batch_labels.append(w.labels_list)
-                #     #batch_labels.append(one_hot_labels)
+                seq_lengths = [batch_word.length]  # Вектор длин каждой последовательности
                 inputs_arr = np.asarray(batch_inputs)
                 targets_array = np.asarray(batch_labels)
-                #targets_array = sparse_tuple_from(targets_array)
-                #targets_array=np.reshape(targets_array,newshape=(-1,self.batch_size,self.num_classes)
-                
-                #targets_sparse_tensor=tf.SparseTensor(targets_array[0],targets_array[1],targets_array[2])
-                #s, loss, logits,probs, ler, decoded_integers,targets,_ = session.run([self.cost, self.loss, self.logits, self.probs, self.ler, self.decoded_integers, self.targets, self.train_fn],
-                 #                                                            feed_dict={self.inputs: inputs_arr, self.targets: targets_array,
-                 #                                                self.seq_len: seq_length})
-                #indices=np.asarray(decoded_integers.indices)
+
                 #веса точек TODO:Переделать, чтобы передавались извне
                 #TODO:Посчитать веса
                 #TODO: переделать под переменную длину либо убрать лишнее и оставить размер батча 1
-                seq_length=seq_lengths[0]
-                entropy_weights=np.ones((self.batch_size,seq_length),dtype=np.float32)
+                #entropy_weights=np.ones((self.batch_size,seq_length),dtype=np.float32)
                 #Подаем батч на вход и получаем результат
                 loss, probs,_=session.run([self.loss, self.probs,  self.train_fn],
-                                          feed_dict={self.inputs: inputs_arr, self.targets: targets_array,self.entropy_weights:entropy_weights,
+                                          feed_dict={self.inputs: inputs_arr, self.targets: targets_array,self.entropy_weights:batch_word.weights,
                                                      self.seq_len: seq_lengths})
-                #train_epoch_cost+=train_cost
-                #train_epoch_nn+=normalized_batch_norm
-                #train_epoch_norm+=train_batch_norm
+                train_epoch_loss+=loss
+                if can_output:
+                    print("word loss:", loss, " Epoch:", i,"Word:",j)
 
-                #if can_output:
-                    #print("batch cost:",train_cost," Epoch:",i)
-                    #print("batch norm:", train_batch_norm)
-                    #print("normalized batch norm:",normalized_batch_norm)
+                       # train_epoch_cost+=train_cost
+            # train_epoch_nn+=normalized_batch_norm
+            # train_epoch_norm+=train_batch_norm
+
+            # if can_output:
+            # print("batch cost:",train_cost," Epoch:",i)
+            # print("batch norm:", train_batch_norm)
+            # print("normalized batch norm:",normalized_batch_norm)
 
             """Конец эпохи(Прошли весь тренировочный датасет)"""
             #Валидация
@@ -218,16 +168,18 @@ class LSTMDecoder:
                 validation_epoch_nn=0
                 validation_epoch_cost=0
                 validation_loss_sum=0
-                for valid_feed in validation_feeds:#Для каждого батча валидации
 
-                    validation_loss,validation_nn=session.run([self.loss],
-                                                                              feed_dict={self.inputs:valid_feed[0],
-                                                                                         self.targets:valid_feed[1],self.seq_len:valid_feed[2]})
-                    #validation_epoch_norm+=validation_norm
-                    #validation_epoch_nn+=validation_nn
-                    #validation_epoch_cost+=validation_cost
+                for val_word in validation_data:#Для каждого слова валидации
+                    val_inputs_arr = np.asarray([val_word.point_list])
+                    val_targets_arr=np.asarray([val_word.labels_list])
+
+                    validation_loss=session.run(self.loss,
+                                                                              feed_dict={self.inputs:val_inputs_arr,
+                                                                                         self.targets:val_targets_arr,
+                                                                                         self.seq_len:[val_word.length],
+                                                                                         self.entropy_weights:val_word.weights})
                     validation_loss_sum+=validation_loss
-                val_feeds_len=len(validation_feeds)
+                val_feeds_len=len(validation_data)
                 validation_epoch_norm/=val_feeds_len
                 validation_epoch_cost/=val_feeds_len
                 validation_epoch_nn/=val_feeds_len
@@ -241,27 +193,27 @@ class LSTMDecoder:
                         print("On validation set:")
                         print("Epoch number:", i)
                         print("Epoch loss:",epoch_validation_loss)
-                        print("Epoch cost:", validation_epoch_cost)
-                        print("Epoch norm:", validation_epoch_norm)
                         print("Epoch normalized distance:",validation_epoch_nn)
-            train_epoch_cost /= train_len
-            train_epoch_norm/=train_len
-            train_epoch_nn/=train_len
-
+            # train_epoch_cost /= train_len
+            # train_epoch_norm/=train_len
+            # train_epoch_nn/=train_len
+            train_epoch_loss /= len(training_words)
             elapsed_time=time.time()-start_time
             if i%output_period==0 or i==num_epochs-1:
                 if output_training:
                     print("On training set:")
                     print("Epoch number:",i)
-                    print("Epoch cost:", train_epoch_cost)
-                    print(f"Epoch norm:{train_epoch_norm}")
-                    print(f"Epoch normalized distance{train_epoch_nn}")
+                    print(f"Epoch loss:{train_epoch_loss}")
+                    #print("Epoch cost:", train_epoch_cost)
+                    #print(f"Epoch norm:{train_epoch_norm}")
+                    #print(f"Epoch normalized distance{train_epoch_nn}")
                     print(f"Time:{elapsed_time}")
                 #epoch_errors.append({"Epoch":i,"Error":train_epoch_cost,"Edit distance":edit_dist,"Time":elapsed_time})
-                epoch_errors_data["Train norm"]=train_epoch_norm
-                epoch_errors_data["Epoch normalized distance"]=train_epoch_nn
-                epoch_errors_data["Train cost"] = train_epoch_cost
+                # epoch_errors_data["Train norm"]=train_epoch_norm
+                # epoch_errors_data["Epoch normalized distance"]=train_epoch_nn
+                # epoch_errors_data["Train cost"] = train_epoch_cost
                 epoch_errors_data["Time"]=elapsed_time
+                epoch_errors_data["Train loss"]=train_epoch_loss
                 epoch_errors_data["Epoch"]=i
                 epoch_errors.append(epoch_errors_data)
 
@@ -317,7 +269,6 @@ class LSTMDecoder:
         self.num_features=num_features
         self.batch_size = batch_size
         shape = tf.shape(self.inputs)
-        batch_s, max_timesteps = shape[0], shape[1]
         # self.targets = tf.placeholder(tf.float32, (None, None, num_classes))#
         # Here we use sparse_placeholder that will generate a
         # SparseTensor required by ctc_loss op.
