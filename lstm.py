@@ -110,8 +110,31 @@ class LSTMDecoder:
         """
         weighted_words=list(words)
         for word in weighted_words:
-            word.weights=np.ones((self.batch_size,len(word.point_list)),dtype=np.float32)
-            word.length=len(word.point_list)
+            word.length = len(word.point_list)
+            labels_arr=np.asarray(word.labels_list)
+            num_for_classes=np.zeros(self.num_classes)
+            for nc in range(self.num_classes):#Посчитать, сколько объектов каждого класса входит
+                #indices=np.where(labels_arr==nc)
+                num_for_classes[nc]=np.count_nonzero(labels_arr==nc)#Количество точек данного класса
+            #Задать веса
+            word.weights = np.ones((self.batch_size, len(word.point_list)), dtype=np.float32)
+            class_weights=np.ones(self.num_classes)
+            n0=num_for_classes[0]
+            i=0
+            for ni in num_for_classes:
+                x=n0/ni
+                class_weights[i]=x
+                i+=1
+            for j in range(self.num_classes):
+                class_mask=(labels_arr==j)
+                word.weights[0][class_mask]=class_weights[j]
+            #s_1=sum(word.labels_list)#Количество точек 1-го класса
+
+            #s_0=word.length-s_1#кол-во точек 0-го класса
+
+
+
+
         data_len=len(weighted_words)
         train_len=data_len#Если нет валидации, берем весь массив слов
         valid_len=0
@@ -124,13 +147,10 @@ class LSTMDecoder:
             validation_data=weighted_words[train_len:]
         training_words = weighted_words[:train_len]
 
-
         for i in np.arange(num_epochs):
             epoch_errors_data=dict()
             np.random.shuffle(words)#
             train_epoch_loss = 0  # Средняя ошибка по всем батчам в данной эпохе
-            train_epoch_nn=0
-            train_epoch_norm=0
             can_output=output_training and (i%output_period==0 or i==num_epochs-1)
             for j in np.arange(0, len(training_words)):  # Цикл по всем тренировочным словам, берем по 1 слову
                 batch_word = training_words[j]  # слова для создания батча
