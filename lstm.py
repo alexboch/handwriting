@@ -169,20 +169,20 @@ class LSTMDecoder:
             train_epoch_norm=0
             can_output=output_training and (i%output_period==0 or i==num_epochs-1)
             for j in np.arange(0, len(training_data), self.batch_size):  # Цикл по всем тренировочным словам, берем по batch_size слов, составляем батчи для тренировки
-                j1 = j
-                j2 = j1 + self.batch_size
-                batch_words = training_data[j:j2]  # слова для создания батча
-                batch_inputs = []
-                batch_labels = []
-                seq_lengths = []  # Вектор длин каждой последовательности
+                # j1 = j
+                # j2 = j1 + self.batch_size
+                batch_word = training_data[j]  # слова для создания батча
+                batch_inputs = [batch_word.point_list]
+                batch_labels = [batch_word.labels_list]
+                seq_lengths = [len(batch_word.point_list)]  # Вектор длин каждой последовательности
 
                 # получить список точек и меток
-                for w in batch_words:
-                    batch_inputs.append(w.point_list)
-                    seq_lengths.append(len(w.point_list))  # Присоединяем длину последовательности точек
-                    #one_hot_labels=LSTMDecoder.one_hot(w.labels_list,self.num_classes)
-                    batch_labels.append(w.labels_list)
-                    #batch_labels.append(one_hot_labels)
+                # for w in batch_words:
+                #     batch_inputs.append(w.point_list)
+                #     seq_lengths.append(len(w.point_list))  # Присоединяем длину последовательности точек
+                #     #one_hot_labels=LSTMDecoder.one_hot(w.labels_list,self.num_classes)
+                #     batch_labels.append(w.labels_list)
+                #     #batch_labels.append(one_hot_labels)
                 inputs_arr = np.asarray(batch_inputs)
                 targets_array = np.asarray(batch_labels)
                 #targets_array = sparse_tuple_from(targets_array)
@@ -195,9 +195,13 @@ class LSTMDecoder:
                 #indices=np.asarray(decoded_integers.indices)
                 #веса точек TODO:Переделать, чтобы передавались извне
                 #TODO:Посчитать веса
+                #TODO: переделать под переменную длину либо убрать лишнее и оставить размер батча 1
+                seq_length=seq_lengths[0]
+                entropy_weights=np.ones((self.batch_size,seq_length),dtype=np.float32)
                 #Подаем батч на вход и получаем результат
                 loss, probs,_=session.run([self.loss, self.probs,  self.train_fn],
-                                          feed_dict={self.inputs: inputs_arr, self.targets: targets_array,self.entropy_weights: self.seq_len: seq_lengths})
+                                          feed_dict={self.inputs: inputs_arr, self.targets: targets_array,self.entropy_weights:entropy_weights,
+                                                     self.seq_len: seq_lengths})
                 #train_epoch_cost+=train_cost
                 #train_epoch_nn+=normalized_batch_norm
                 #train_epoch_norm+=train_batch_norm
@@ -213,17 +217,22 @@ class LSTMDecoder:
                 validation_epoch_norm=0#Среднее значение нормы на эпохе для датасета валидации
                 validation_epoch_nn=0
                 validation_epoch_cost=0
+                validation_loss_sum=0
                 for valid_feed in validation_feeds:#Для каждого батча валидации
+
                     validation_loss,validation_nn=session.run([self.loss],
-                                                                              feed_dict={self.inputs:valid_feed[0],self.targets:valid_feed[1],self.seq_len:valid_feed[2]})
+                                                                              feed_dict={self.inputs:valid_feed[0],
+                                                                                         self.targets:valid_feed[1],self.seq_len:valid_feed[2]})
                     #validation_epoch_norm+=validation_norm
                     #validation_epoch_nn+=validation_nn
                     #validation_epoch_cost+=validation_cost
-
+                    validation_loss_sum+=validation_loss
                 val_feeds_len=len(validation_feeds)
                 validation_epoch_norm/=val_feeds_len
                 validation_epoch_cost/=val_feeds_len
                 validation_epoch_nn/=val_feeds_len
+                epoch_validation_loss=validation_loss_sum/val_feeds_len
+                epoch_errors_data["Validation loss"]=epoch_validation_loss
                 epoch_errors_data["Validation norm"]=validation_epoch_norm
                 epoch_errors_data["Validation cost"]=validation_epoch_cost
                 epoch_errors_data["Validation normalized distance"]=validation_epoch_nn
@@ -231,6 +240,7 @@ class LSTMDecoder:
                     if output_training:
                         print("On validation set:")
                         print("Epoch number:", i)
+                        print("Epoch loss:",epoch_validation_loss)
                         print("Epoch cost:", validation_epoch_cost)
                         print("Epoch norm:", validation_epoch_norm)
                         print("Epoch normalized distance:",validation_epoch_nn)
