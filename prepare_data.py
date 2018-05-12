@@ -79,12 +79,20 @@ class DataHelper:
     def get_vectors_from_points(points):
         vectors=[]#список векторов
         if len(points)==1:
-            points.append(points[0])#Чтобы получился вектор из одной точки
-        for i in np.arange(len(points)-1):
-            p1=points[i]#текущая точка
-            p2=points[i+1]#следующая точка
-            v=[p2[0]-p1[0],p2[1]-p1[1]]
-            vectors.append(v)
+            #points.append(points[0])#Чтобы получился вектор из одной точки
+            vectors.append([0,0])
+        #for i in np.arange(len(points)-1):
+        #    p1=points[i]#текущая точка
+        #    p2=points[i+1]#следующая точка
+        #    v=[p2[0]-p1[0],p2[1]-p1[1]]
+        #    vectors.append(v)
+        else:
+            p1=points[0]
+            for i in np.arange(1,len(points)):
+                p2=points[i]
+                v = [p2[0] - p1[0], p2[1] - p1[1]]
+                vectors.append(v)
+                p1=points[i]
         vectors=normalize(vectors)  # нормализовать векторы
         return vectors
 
@@ -136,9 +144,14 @@ class DataHelper:
                         #map(lambda p: p.split(","),points_list)
                         points_list=list(map(lambda x:list(map(float, x)),points_list))#превратить координаты в числа
                         vectors=DataHelper.get_vectors_from_points(points_list)
-                        for j in np.arange(len(vectors)):#Цикл по всем точкам списка
+                        #vectors=points_list
+                        for j in np.arange(len(vectors)):#Цикл по всем точкам списка TODO:Исправить, чтобы не терялась последняя метка
                             vector=vectors[j]
-                            label=labels_list[j]
+                            if j!=len(vectors)-1 or len(labels_list)==1:
+                                label=labels_list[j]
+                            else:
+                                label=labels_list[j+1]
+
                             if label is not None:#Если не нулевая метка
                                 is_labeled=True
                                 word_index = label['Item2']  # индекс слова в списке

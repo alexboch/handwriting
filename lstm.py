@@ -41,13 +41,10 @@ class LSTMDecoder:
         :return:Вероятности каждого класса для каждой точки каждого списка
         """
         model_name = os.path.join(model_dir, model_name + ".meta")
-        # session = tf.Session()
         with tf.Session() as session:
-            # saver = tf.train.Saver()
             saver = tf.train.import_meta_graph(model_name)
             saver.restore(session, tf.train.latest_checkpoint(model_dir))  # Загрузить натренированную модель
-            # session.run(tf.global_variables_initializer())
-            length = [len(points_list) for points_list in points]
+            #length = [len(points_list) for points_list in points]
             probs_list = []
             for points_list in points:
                 input_arr = np.asarray(points_list)
@@ -101,7 +98,8 @@ class LSTMDecoder:
         session.run(tf.global_variables_initializer())
         num_batches = len(words) / self.batch_size
         num_words = len(words)
-        output_period=max(num_epochs/100.0*5,1)#Выводить каждый раз, когда прошло 5% обучения
+        #output_period=max(num_epochs/100.0*2,1)#Выводить каждый раз, когда прошло 2% обучения
+        output_period=1
         epoch_errors=[]
         start_time=time.time()
 
@@ -128,12 +126,6 @@ class LSTMDecoder:
             for j in range(self.num_classes):
                 class_mask=(labels_arr==j)
                 word.weights[0][class_mask]=class_weights[j]
-            #s_1=sum(word.labels_list)#Количество точек 1-го класса
-
-            #s_0=word.length-s_1#кол-во точек 0-го класса
-
-
-
 
         data_len=len(weighted_words)
         train_len=data_len#Если нет валидации, берем весь массив слов
@@ -160,8 +152,6 @@ class LSTMDecoder:
                 inputs_arr = np.asarray(batch_inputs)
                 targets_array = np.asarray(batch_labels)
 
-                #веса точек TODO:Переделать, чтобы передавались извне
-                #TODO:Посчитать веса
                 #TODO: переделать под переменную длину либо убрать лишнее и оставить размер батча 1
                 #entropy_weights=np.ones((self.batch_size,seq_length),dtype=np.float32)
                 #Подаем батч на вход и получаем результат
@@ -171,15 +161,6 @@ class LSTMDecoder:
                 train_epoch_loss+=loss
                 if can_output:
                     print("word loss:", loss, " Epoch:", i,"Word:",j)
-
-                       # train_epoch_cost+=train_cost
-            # train_epoch_nn+=normalized_batch_norm
-            # train_epoch_norm+=train_batch_norm
-
-            # if can_output:
-            # print("batch cost:",train_cost," Epoch:",i)
-            # print("batch norm:", train_batch_norm)
-            # print("normalized batch norm:",normalized_batch_norm)
 
             """Конец эпохи(Прошли весь тренировочный датасет)"""
             #Валидация
@@ -214,9 +195,6 @@ class LSTMDecoder:
                         print("Epoch number:", i)
                         print("Epoch loss:",epoch_validation_loss)
                         print("Epoch normalized distance:",validation_epoch_nn)
-            # train_epoch_cost /= train_len
-            # train_epoch_norm/=train_len
-            # train_epoch_nn/=train_len
             train_epoch_loss /= len(training_words)
             elapsed_time=time.time()-start_time
             if i%output_period==0 or i==num_epochs-1:
@@ -224,14 +202,7 @@ class LSTMDecoder:
                     print("On training set:")
                     print("Epoch number:",i)
                     print(f"Epoch loss:{train_epoch_loss}")
-                    #print("Epoch cost:", train_epoch_cost)
-                    #print(f"Epoch norm:{train_epoch_norm}")
-                    #print(f"Epoch normalized distance{train_epoch_nn}")
                     print(f"Time:{elapsed_time}")
-                #epoch_errors.append({"Epoch":i,"Error":train_epoch_cost,"Edit distance":edit_dist,"Time":elapsed_time})
-                # epoch_errors_data["Train norm"]=train_epoch_norm
-                # epoch_errors_data["Epoch normalized distance"]=train_epoch_nn
-                # epoch_errors_data["Train cost"] = train_epoch_cost
                 epoch_errors_data["Time"]=elapsed_time
                 epoch_errors_data["Train loss"]=train_epoch_loss
                 epoch_errors_data["Epoch"]=i
@@ -241,8 +212,6 @@ class LSTMDecoder:
             for k,v in train_epoch_cost.items():
                 train_epoch_cost[k]=str(v).replace('.',',')#Заменить на запятую, чтобы excel понимал
         #Вывод в csv-файл
-        #headers=['Epoch','Error','Edit distance',"Time"]
-
         self._csv_path=os.path.join(model_dir_path,f"{model_name}.csv")
         if not os.path.exists(model_dir_path):
             os.makedirs(model_dir_path)#Создать папку модели, если она не существует
@@ -270,6 +239,12 @@ class LSTMDecoder:
 
 
     def create_multi_bilstm(self,num_layers,inputs):
+        """
+        Создает двунаправленную LSTM-сеть
+        :param num_layers:
+        :param inputs:
+        :return:
+        """
         cells_fw=[]
         cells_bw=[]
         for n in range(num_layers):
@@ -289,34 +264,33 @@ class LSTMDecoder:
         self.num_features=num_features
         self.batch_size = batch_size
         shape = tf.shape(self.inputs)
-        # self.targets = tf.placeholder(tf.float32, (None, None, num_classes))#
-        # Here we use sparse_placeholder that will generate a
-        # SparseTensor required by ctc_loss op.
-
-        #self.targets = tf.sparse_placeholder(tf.int32)
-        #self.targets=tf.placeholder(tf.int32,[None,batch_size])
         self.targets=tf.placeholder(tf.int32,shape=[self.batch_size,None],name='targets')
         self.cells_stack = tf.contrib.rnn.MultiRNNCell([self.lstm_cell() for _ in range(self.num_layers)],
                                                        state_is_tuple=True)
 
-        # for i in range(self.num)
-
         self.W = tf.Variable(
             tf.truncated_normal([self.num_units, self.num_classes], stddev=0.1),name='W')  # Начальная матрица весов
         self.b = tf.Variable(tf.constant(0., shape=[self.num_classes]),name='b')
-        # Given inputs (time, batch, input_size) outputs a tuple
-        #  - outputs: (time, batch, output_size)  [do not mistake with OUTPUT_SIZE]
-        #  - states:  (time, batch, hidden_size)
+
 
         # 1d array of size [batch_size]
         self.seq_len = tf.placeholder(tf.int32, [None], name='seq_len')
         # rnn_outputs--Тензор размерности [batch_size,max_time,cell.output_size],max_time--кол-во точек слова,cell.output_size=2(x,y координаты)
         # rnn_state--последнее состояние
+        cells_fw = []
+        cells_bw = []
+        for n in range(num_layers):
+            cell_fw = self.lstm_cell()
+            cell_bw = self.lstm_cell()
+            cells_fw.append(cell_fw)
+            cells_bw.append(cell_bw)
+        self.rnn_outputs, self.rnn_state_fw,self.rnn_state_bw=tf.contrib.rnn.stack_bidirectional_dynamic_rnn(cells_fw=cells_fw, cells_bw=cells_bw, inputs=self.inputs,
+                                                              dtype=tf.float32)
 
-        # self.rnn_outputs, self.rnn_state_fw,_ = tf.contrib.rnn.stack_bidirectional_dynamic_rnn(self.cells_stack, self.inputs, self.seq_len,
+        #self.rnn_outputs, self.rnn_state_fw,self.output_state_bw = tf.contrib.rnn.stack_bidirectional_dynamic_rnn(self.cells_stack, self.inputs, self.seq_len,
         #                                                        dtype=tf.float32)
-        self.rnn_outputs, self.rnn_state_fw = tf.nn.dynamic_rnn(self.cells_stack, self.inputs, self.seq_len,
-                                                                dtype=tf.float32)
+        #self.rnn_outputs, self.rnn_state_fw = tf.nn.dynamic_rnn(self.cells_stack, self.inputs, self.seq_len,
+        #                                                        dtype=tf.float32)
         #self.rnn_outputs,self.output_state_fw,self.output_state_bw=self.create_multi_bilstm(self.num_layers,self.inputs)
         # Reshaping to apply the same weights over the timesteps
         self.rnn_outputs = tf.reshape(self.rnn_outputs, [-1, self.num_units])
