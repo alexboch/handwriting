@@ -34,25 +34,25 @@ def get_num_epochs(train_config):
     :return:
     """
     if train_config==TrainConfig.BORDERS:
-        return 200
+        return 25
     else:
         if train_config==TrainConfig.LETTERS_MERGED:
             return 500
         else:
             if train_config==TrainConfig.LETTERS:
-                return 1000
+                return 25
             else:
                 return 1000
 
 def get_network_config(train_config):
     if train_config==TrainConfig.BORDERS:
-        return NetworkConfig(num_units=500,num_layers=2,num_features=2,learning_rate=1e-2)
+        return NetworkConfig(num_units=256,num_layers=2,num_features=2,learning_rate=1e-2)
     else:
         if train_config==TrainConfig.LETTERS_MERGED:
             return NetworkConfig(num_units=400,num_layers=1,num_features=2,learning_rate=1e-6)
         else:
             if train_config==TrainConfig.LETTERS:
-                return NetworkConfig(500,1,2,1e-8)
+                return NetworkConfig(512,2,2,1e-3)
             else:
                 return NetworkConfig(500, 1, 2, 1e-8)
 

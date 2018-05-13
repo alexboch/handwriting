@@ -155,9 +155,12 @@ class LSTMDecoder:
                 #TODO: переделать под переменную длину либо убрать лишнее и оставить размер батча 1
                 #entropy_weights=np.ones((self.batch_size,seq_length),dtype=np.float32)
                 #Подаем батч на вход и получаем результат
-                loss, probs,_=session.run([self.loss, self.probs,  self.train_fn],
-                                          feed_dict={self.inputs: inputs_arr, self.targets: targets_array,self.entropy_weights:batch_word.weights,
-                                                     self.seq_len: seq_lengths})
+                loss,probs,_ = session.run([self.loss,self.probs,self.train_fn],
+                                                                       feed_dict={self.inputs: inputs_arr, self.targets: targets_array,self.entropy_weights:batch_word.weights,
+                                                                                  self.seq_len: seq_lengths})
+                # loss, probs,_=session.run([self.loss, self.probs,  self.train_fn],
+                #                           feed_dict={self.inputs: inputs_arr, self.targets: targets_array,self.entropy_weights:batch_word.weights,
+                #                                      self.seq_len: seq_lengths})
                 train_epoch_loss+=loss
                 if can_output:
                     print("word loss:", loss, " Epoch:", i,"Word:",j)
@@ -269,7 +272,7 @@ class LSTMDecoder:
                                                        state_is_tuple=True)
 
         self.W = tf.Variable(
-            tf.truncated_normal([self.num_units, self.num_classes], stddev=0.1),name='W')  # Начальная матрица весов
+            tf.truncated_normal([self.num_units*2, self.num_classes], stddev=0.1),name='W')  # Начальная матрица весов, домножается на 2, т.к. сеть двунаправленная
         self.b = tf.Variable(tf.constant(0., shape=[self.num_classes]),name='b')
 
 
@@ -285,6 +288,7 @@ class LSTMDecoder:
             cells_fw.append(cell_fw)
             cells_bw.append(cell_bw)
         self.rnn_outputs, self.rnn_state_fw,self.rnn_state_bw=tf.contrib.rnn.stack_bidirectional_dynamic_rnn(cells_fw=cells_fw, cells_bw=cells_bw, inputs=self.inputs,
+                                                                                                             sequence_length=self.seq_len,
                                                               dtype=tf.float32)
 
         #self.rnn_outputs, self.rnn_state_fw,self.output_state_bw = tf.contrib.rnn.stack_bidirectional_dynamic_rnn(self.cells_stack, self.inputs, self.seq_len,
@@ -292,8 +296,10 @@ class LSTMDecoder:
         #self.rnn_outputs, self.rnn_state_fw = tf.nn.dynamic_rnn(self.cells_stack, self.inputs, self.seq_len,
         #                                                        dtype=tf.float32)
         #self.rnn_outputs,self.output_state_fw,self.output_state_bw=self.create_multi_bilstm(self.num_layers,self.inputs)
+        #self.first_nn_outputs
         # Reshaping to apply the same weights over the timesteps
-        self.rnn_outputs = tf.reshape(self.rnn_outputs, [-1, self.num_units])
+        self.rnn_outputs=self.rnn_outputs[-1]#Берем вывод последнего слоя
+        self.rnn_outputs = tf.reshape(self.rnn_outputs, [-1, self.num_units*2])
         self.logits = tf.matmul(self.rnn_outputs, self.W) + self.b
         # Reshaping back to the original shape
         self.logits = tf.reshape(self.logits, [self.batch_size, -1, self.num_classes])
