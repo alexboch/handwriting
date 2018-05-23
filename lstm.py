@@ -117,7 +117,7 @@ class LSTMDecoder:
             #Задать веса
             word.weights = np.ones((self.batch_size, len(word.point_list)), dtype=np.float32)
             class_weights=np.ones(self.num_classes)
-            n0=num_for_classes[0]
+            n0=num_for_classes[np.where(num_for_classes>0)][0]
             i=0
             for ni in num_for_classes:
                 x=n0/ni
@@ -188,6 +188,7 @@ class LSTMDecoder:
                 validation_epoch_cost/=val_feeds_len
                 validation_epoch_nn/=val_feeds_len
                 epoch_validation_loss=validation_loss_sum/val_feeds_len
+                epoch_errors_data["Epoch"] = i
                 epoch_errors_data["Validation loss"]=epoch_validation_loss
                 epoch_errors_data["Validation norm"]=validation_epoch_norm
                 epoch_errors_data["Validation cost"]=validation_epoch_cost
@@ -207,8 +208,8 @@ class LSTMDecoder:
                     print(f"Epoch loss:{train_epoch_loss}")
                     print(f"Time:{elapsed_time}")
                 epoch_errors_data["Time"]=elapsed_time
+
                 epoch_errors_data["Train loss"]=train_epoch_loss
-                epoch_errors_data["Epoch"]=i
                 epoch_errors.append(epoch_errors_data)
 
         for train_epoch_cost in epoch_errors:

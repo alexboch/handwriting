@@ -7,7 +7,7 @@ import tensorflow as tf
 
 tf.reset_default_graph()
 #tb = TrainerBuilder(TrainConfig.BORDERS)
-tb=TrainerBuilder(TrainConfig.LETTERS)
+tb=TrainerBuilder(TrainConfig.BORDERS)
 #tb.set_learning_rate(1e-2)
 
 #tb.set_learning_rate(1e-5)
