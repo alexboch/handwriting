@@ -2,6 +2,7 @@ import tensorflow as tf
 import pandas as pd
 import numpy as np
 import os
+from PointsAndRectangles import *
 import constants
 from operator import methodcaller
 from sklearn.preprocessing import normalize
@@ -74,6 +75,13 @@ class DataHelper:
         wl=list(self.words_dict.values())
         flattened_list=[item for sublist in wl for item in sublist]
         return flattened_list
+
+
+    @staticmethod
+    def get_data_vectors(points):
+        vectors=[]
+
+        return vectors
 
     @staticmethod
     def get_vectors_from_points(points):

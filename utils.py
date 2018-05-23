@@ -4,11 +4,12 @@ from __future__ import print_function
 
 from six.moves.urllib.request import urlretrieve
 from six.moves import xrange as range
-
+from PointsAndRectangles import *
 import os
 import sys
 import numpy as np
 from winreg import *
+from sklearn.preprocessing import normalize
 
 url = 'https://catalog.ldc.upenn.edu/desc/addenda/'
 last_percent_reported = None
@@ -16,6 +17,43 @@ last_percent_reported = None
 def normalized_frobenius(arr1,arr2):
     diff=arr1-arr2
     err=np.linalg.norm(diff)
+
+
+def get_vectors_from_points(points,normalize_vectors=False):
+    vectors=[]#список векторов
+    if len(points)==1:
+        #points.append(points[0])#Чтобы получился вектор из одной точки
+        vectors.append([0,0])
+    #for i in np.arange(len(points)-1):
+    #    p1=points[i]#текущая точка
+    #    p2=points[i+1]#следующая точка
+    #    v=[p2[0]-p1[0],p2[1]-p1[1]]
+    #    vectors.append(v)
+    else:
+        p1=points[0]
+        for i in np.arange(1,len(points)):
+            p2=points[i]
+            v = [p2[0] - p1[0], p2[1] - p1[1]]
+            vectors.append(v)
+            p1=points[i]
+    if normalize_vectors:
+        vectors=normalize(vectors)  # нормализовать векторы
+    return vectors
+
+def get_bounds(points):
+    """
+    :param points:массив точек, каждая точка--массив вида{x,y}
+    :return:
+    """
+    min_x=min(points,key=lambda p:p[0])[0]#Находит точку, берем первую координату(x)
+    min_y=min(points,key=lambda p:p[1])[1]
+    max_x=max(points,key=lambda p:p[0])[0]
+    max_y = max(points, key=lambda p: p[1])[1]
+    top_left=Point(min_x,min_y)
+    bottom_right=Point(max_x,max_y)
+    r=Rect(top_left,bottom_right)
+    return r
+    pass
 
 
 def levenshtein(s1, s2):
