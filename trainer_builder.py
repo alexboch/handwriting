@@ -20,7 +20,9 @@ class TrainerBuilder:
     def __init__(self,init_config=None):
         if init_config!=None:
             self.alphabet=conf.get_alphabet(init_config)
+            self.featurizer = conf.get_featurizer(init_config)
             self.labels_mapper=conf.get_labels_mapper(init_config)
+            #TODO:Сделать, чтобы количество признаков устанавливалось через featurizer
             self.net_config=conf.get_network_config(init_config)
             self.num_classes=self.alphabet.get_length()#Для всех символов
             self.num_epochs=conf.get_num_epochs(init_config)
@@ -28,9 +30,13 @@ class TrainerBuilder:
                                 self.net_config.learning_rate,self.net_config.batch_size,self.alphabet)
             self.model_name=conf.get_model_name(init_config)
             self.data_dir=conf.get_data_directory(init_config)
-            self.data_loader=pd.DataHelper(self.alphabet,self.labels_mapper)
+
+            self.data_loader=pd.DataHelper(self.alphabet,self.featurizer,labels_map_function=self.labels_mapper)
             #self._trainer = tr.Trainer(self.network, self.data_loader, self.num_epochs, self.model_name, self.data_dir, True)
         pass
+
+
+    #def set_featurizer(self,ft_set):
 
 
     def set_learning_rate(self,learning_rate):

@@ -6,7 +6,7 @@ from PointsAndRectangles import *
 import constants
 from operator import methodcaller
 from sklearn.preprocessing import normalize
-
+from feature_points_set_base import *
 
 
 class LabelsAlphabet:
@@ -56,14 +56,15 @@ class WordData:#TODO:Добавить координаты точек
         self.point_list=[]
         self.labels_list=[]
         self.text=""
-    
+
         
 class DataHelper:
     
     #Словарь с точками слов и метками
     words_dict={}
-    def __init__(self,labels_alphabet,labels_map_function=None):
+    def __init__(self, labels_alphabet, featurizer:FeaturePointsSetBase, labels_map_function=None):
         self.labels_alphabet=labels_alphabet
+        self.featurizer=featurizer
         self.labels_map_function=labels_map_function
         return
 
@@ -151,7 +152,9 @@ class DataHelper:
                         points_list=list(map(methodcaller("split",","),points_list))#разделить координаты на x и y
                         #map(lambda p: p.split(","),points_list)
                         points_list=list(map(lambda x:list(map(float, x)),points_list))#превратить координаты в числа
-                        vectors=DataHelper.get_vectors_from_points(points_list)
+                        #vectors=DataHelper.get_vectors_from_points(points_list)
+                        self.featurizer.CreateFeatures(points_list)#Вычислить признаки точек
+                        vectors=self.featurizer.GetFeatures()
                         #vectors=points_list
                         for j in np.arange(len(vectors)):#Цикл по всем точкам списка TODO:Исправить, чтобы не терялась последняя метка
                             vector=vectors[j]

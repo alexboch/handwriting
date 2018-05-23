@@ -4,15 +4,12 @@ import numpy as np
 class FeaturePointsSetBase(abc.ABC):
 
 
-    def __init__(self,points):
-        self.CreateFeatures(points)
+    def __init__(self,points=None):
+        if points is not None:
+            self.CreateFeatures(points)
         pass
 
 
-    @abc.abstractmethod
-    def GetFeatureVector(self,point):
-
-        pass
 
     @abc.abstractmethod
     def GetNumFeatures(self):

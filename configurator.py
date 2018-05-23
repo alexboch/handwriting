@@ -3,7 +3,8 @@ import prepare_data as prepdata
 import numpy as np
 import constants
 import tensorflow as tf
-
+import feauturizer_factories as ff
+from feature_vectors_set import *
 """
 В этом модуле задается соответствие между параметрами и конфигурациями
 """
@@ -59,6 +60,12 @@ def get_network_config(train_config):
 def get_model_name(train_config):
     return train_config.name
 
+def get_featurizer(train_config):
+    if train_config==TrainConfig.BORDERS:
+        return FeatureVectorsSet()
+    else:
+        return FeaturePointsSetBase()
+
 def make_label(symbol,index):
     return {constants.CHAR_KEY:symbol,constants.INDEX_KEY:index}
 
@@ -70,7 +77,7 @@ def lstm_cell_factory(num_units):
 
 def get_cell_factory(train_config):
     """Функция, создающая клетку нейронки"""
-    return
+
 
 def connections_only_mapper(labels_list):
     """

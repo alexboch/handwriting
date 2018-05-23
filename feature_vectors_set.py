@@ -3,6 +3,10 @@ import utils
 
 class FeatureVectorsSet(FeaturePointsSetBase):
 
+
+    def GetNumFeatures(self):
+        return 5
+
     def _createFeatures(self,points):
         features_list=[]
         bounds=utils.get_bounds(points)
@@ -16,5 +20,5 @@ class FeatureVectorsSet(FeaturePointsSetBase):
             x_dir=vectors[i][0]#Направление по x
             y_dir=vectors[i][1]#Направление по y
             length=np.linalg.norm(vectors[i])#Длина вектора
-
+            features_list.append((rel_x,rel_y,x_dir,y_dir,length))
         return features_list
