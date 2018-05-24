@@ -21,10 +21,9 @@ class CellType(Enum):
     BIDIR_LSTM=3
 
 class NetworkConfig:
-    def __init__(self,num_units,num_layers,num_features,learning_rate,batch_size=1):
+    def __init__(self,num_units,num_layers,learning_rate,batch_size=1):
         self.num_units=num_units
         self.num_layers=num_layers
-        self.num_features=num_features
         self.learning_rate=learning_rate
         self.batch_size=batch_size
 
@@ -47,15 +46,15 @@ def get_num_epochs(train_config):
 
 def get_network_config(train_config):
     if train_config==TrainConfig.BORDERS:
-        return NetworkConfig(num_units=256,num_layers=2,num_features=2,learning_rate=1e-2)
+        return NetworkConfig(num_units=256,num_layers=2,learning_rate=1e-2)
     else:
         if train_config==TrainConfig.LETTERS_MERGED:
-            return NetworkConfig(num_units=400,num_layers=1,num_features=2,learning_rate=1e-6)
+            return NetworkConfig(num_units=400,num_layers=1,learning_rate=1e-6)
         else:
             if train_config==TrainConfig.LETTERS:
-                return NetworkConfig(512,2,2,1e-3)
+                return NetworkConfig(512,2,1e-3)
             else:
-                return NetworkConfig(500, 1, 2, 1e-8)
+                return NetworkConfig(500,1,1e-8)
 
 def get_model_name(train_config):
     return train_config.name

@@ -9,7 +9,7 @@ class Trainer:
     """
     Запускает процесс загрузки данных и тренировки нейросети
     """
-    def __init__(self,network,data_loader,num_epochs,model_name,data_directory,output_training=False):
+    def __init__(self,network:LSTMDecoder,data_loader:DataHelper,num_epochs,model_name,data_directory,output_training=False):
         self.network=network
         self.num_epochs=num_epochs
         self.model_name=model_name
@@ -41,7 +41,6 @@ class Trainer:
         """
         points=[word.point_list for word in words_list]
         return self.network.label(points,model_dir='D:\Projects\Python\handwriting\Data\BORDERS\\',model_name='BORDERS')
-        #return [self.network.label([word.point_list])[0] for word in words_list]
 
     def run_training(self, test=False):
         self.load_data()

@@ -62,7 +62,7 @@ class DataHelper:
     
     #Словарь с точками слов и метками
     words_dict={}
-    def __init__(self, labels_alphabet, featurizer:FeaturePointsSetBase, labels_map_function=None):
+    def __init__(self, labels_alphabet:LabelsAlphabet, featurizer:FeaturePointsSetBase, labels_map_function=None):
         self.labels_alphabet=labels_alphabet
         self.featurizer=featurizer
         self.labels_map_function=labels_map_function
@@ -76,6 +76,8 @@ class DataHelper:
         wl=list(self.words_dict.values())
         flattened_list=[item for sublist in wl for item in sublist]
         return flattened_list
+
+
 
 
     @staticmethod
@@ -124,45 +126,27 @@ class DataHelper:
         raw_data=pd.read_json(filename,encoding='utf8')
         transposed_data=raw_data.T
         labeled_words=[]
-
         words_data=[]
         #Создать ключи словаря из слов всех текстов
-        
-        #words_dict=dict.fromkeys(np.hstack(transposed_data['TextWords'].ravel()))
-        
         for text in transposed_data.iterrows():#Цикл по всем текстам текущего файла
             pl=text[1][['PointLists','Labels']].dropna()#выбрать  списки точек и соответствующие им списки меток
-            #words_dict=dict.fromkeys(text_words)
             num_words=len(text[1].TextWords)
             tmp_words_data=[]
             for i in np.arange(num_words):
                 wd=WordData()
                 tmp_words_data.append(wd)
-            #tmp_words_data=[WordData() for i in np.arange(num_words)]#временный список данных слов для текущего текста
-            #
-
             is_labeled=False
             try:
                 for i in np.arange(len(pl.PointLists)):#Цикл по всем спискам точек
-                    #points_list=pl.PointLists[i]
-                    #labels_list=pl.Labels[i]
                     points_list,labels_list=DataHelper.filter_nans(pl.PointLists[i],pl.Labels[i])
                     if len(points_list)>0:#Если есть хоть одна метка
                         if self.labels_map_function is not None:
                             labels_list=self.labels_map_function(labels_list)
                         points_list=list(map(methodcaller("split",","),points_list))#разделить координаты на x и y
-                        #map(lambda p: p.split(","),points_list)
                         points_list=list(map(lambda x:list(map(float, x)),points_list))#превратить координаты в числа
-                        #vectors=DataHelper.get_vectors_from_points(points_list)
-
-                        #vectors=self.featurizer.GetFeatures()
-                        #vectors=points_list
                         for j in np.arange(len(points_list)):#Цикл по всем точкам списка TODO:Исправить, чтобы не терялась последняя метка
                             vector=points_list[j]
-                            # if j!=len(points_list)-1 or len(labels_list)==1:
-                            #     label=labels_list[j]
-                            # else:
-                            #     label=labels_list[j+1]
+
                             label=labels_list[j]#Метка задана для каждой точки
                             if label is not None:#Если не нулевая метка
                                 is_labeled=True
@@ -170,7 +154,6 @@ class DataHelper:
                                 tmp_words_data[word_index].point_list.append(vector)#сохранить данные слова по ключу
                                 if not merged_labels:
                                     char_label=label['Item1']
-                                    #integer_label=self.label_to_int(char_label)#Букву в число
                                     integer_label=self.labels_alphabet.label_to_int(char_label)
                                     tmp_words_data[word_index].labels_list.append(integer_label)
                                     assert(text[1].TextWords[word_index]!='')
@@ -178,21 +161,16 @@ class DataHelper:
             except IndexError as index_exception:
                 print(index_exception)
             for wd in tmp_words_data:
-                self.featurizer.CreateFeatures(wd.points_list)  # Вычислить признаки точек
-                wd.points_list=self.featurizer.GetFeatures()
+                if wd.point_list is not None and len(wd.point_list)>0:
+                    wd.labels_list=self.featurizer.MapToVectorLabels(wd.point_list,wd.labels_list)
+                    self.featurizer.CreateFeatures(wd.point_list)  # Вычислить признаки точек
+                    wd.point_list=self.featurizer.GetFeatures()
             if is_labeled:#сохранить данные, только если в тексте есть метки
                 words_data.extend(filter(lambda w:w.text!='', tmp_words_data))
         for wd in words_data:#пройти по всем словам и сохранить данные в словарь слов по всем текстам
             if wd.text not in self.words_dict:#если в словаре нет данных для такого словаште
                 assert(wd.text!='')
                 self.words_dict[wd.text]=[]
-
-            #if merged_labels:  #TODO: Генерация списков меток из букв слов
-            #    for c in wd.text:
-
-            #wd.labels_list=DataLoader.insert_blank_labels(wd.labels_list)
-            #if self.labels_map_function is not None:
-            #    wd.labels_dict=self.labels_map_function(wd.labels_list)
             self.words_dict[wd.text].append(wd)#сохранить данные для этого слова               
     pass
 

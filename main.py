@@ -78,13 +78,8 @@ dh.load_labeled_texts('SmallData');
 #dh.load_labeled_texts('Data');
 # нейросеть
 num_classes=69#Строчные и заглавные буквы + соединение + шум + пустая метка
-
-#factory=ConnectionsOnlyDecoderFactory()
 factory=FullAlphabetDecoderFactory()
 ld=factory.CreateDecoder()
-#ld.learning_rate=0.1
-#ld.num_units=75
-#ld = lstm.LSTMDecoder(num_units=300, num_layers=1, num_features=2, num_classes=num_classes, learning_rate=1e-5, batch_size=1)
 train_word=prepdata.WordData()
 train_word.point_list.extend([(1, 1), (0, 0), (-1, 1),(0,0)])
 
@@ -93,10 +88,6 @@ train_word.labels_list.extend(['а', 'и', 'а', 'и'])
 #ld.train([test_word],1000,connections_only_output_func)
 train_word.labels_list=full_alphabet.encode_char_labels(train_word.labels_list)
 ld.train([train_word], 150, train_output_func)
-#ld.train([dh.words_dict['аб'][0]],10000,connections_only_output_func)
-#ld.train(dh.get_words_list(), 50,connections_only_output_func)
-#ld.train(dh.get_words_list(),50,train_output_func)
-#labels,probs=ld.label([dh.words_dict['аб'][0].point_list],"Models/model.ckpt")
 
 test_word=prepdata.WordData()
 test_word.point_list.extend([(0, 0), (-1, 1)])

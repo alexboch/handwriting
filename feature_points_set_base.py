@@ -10,7 +10,6 @@ class FeaturePointsSetBase(abc.ABC):
         pass
 
 
-
     @abc.abstractmethod
     def GetNumFeatures(self):
         pass
@@ -18,6 +17,23 @@ class FeaturePointsSetBase(abc.ABC):
     @abc.abstractmethod
     def _createFeatures(self,points):
         pass
+
+    @abc.abstractmethod
+    def MapToVectorLabels(self,points,pointwise_labels):
+        """
+        :param pointwise_labels:Метки такие, что одной точке соответствует одна метка
+        :return:
+        """
+        pass
+
+    @abc.abstractmethod
+    def MapToPointLabels(self,points,pointwise_labels):
+        """
+        :param pointwise_labels:
+        :return:
+        """
+        pass
+
 
     def CreateFeatures(self, word_points):
         """

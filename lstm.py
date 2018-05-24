@@ -103,9 +103,6 @@ class LSTMDecoder:
         epoch_errors=[]
         start_time=time.time()
 
-        """
-        Создать слова с one-hot метками
-        """
         weighted_words=list(words)
         for word in weighted_words:
             word.length = len(word.point_list)
@@ -313,12 +310,6 @@ class LSTMDecoder:
         #self.diff=tf.subtract(self.probs,self.targets)#Разница между целевыми и вычесленными вероятностями
         #self.reshaped_diff=tf.reshape(self.diff,[-1])
         #self.reshaped_diff.
-
-
-        #self.sqrt_size=tf.sqrt(tf.cast(tf.size(self.diff),tf.float32),name='sqrt_size')
-        #self.norm=tf.norm(self.diff,name='norm')
-        #self.normalized_norm=tf.divide(tf.norm(self.diff), self.sqrt_size, name='norm_norm')#Матричная норма, возвращает скаляр
-        #self.loss=tf.nn.sigmoid_cross_entropy_with_logits(labels=self.targets,logits=self.logits,name='loss')
         self.entropy_weights=tf.placeholder(tf.float32, [self.batch_size, None], 'entropy_weights')
         self.loss=tf.contrib.seq2seq.sequence_loss(self.logits, self.targets, self.entropy_weights)
         #self.loss=tf.nn.sparse_softmax_cross_entropy_with_logits(labels=self.targets,logits=self.logits,name='loss')
