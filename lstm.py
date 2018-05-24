@@ -1,12 +1,7 @@
-import numpy as np
 import tensorflow as tf
 import csv
 import time
-import traceback
-import os
-from prepare_data import DataHelper
 from utils import *
-import tensorflow.contrib.layers as layers
 
 map_fn = tf.map_fn
 
@@ -93,6 +88,8 @@ class LSTMDecoder:
         """
         words--Список слов, содержащих точки и метки
         """
+        os.environ['FOR_DISABLE_CONSOLE_CTRL_HANDLER'] = '1'
+        words=words[0:2]
         print("starting training,epochs:",num_epochs,"learning rate:",self.learning_rate)
         session = tf.Session()
         session.run(tf.global_variables_initializer())
@@ -136,102 +133,107 @@ class LSTMDecoder:
             validation_data=weighted_words[train_len:]
         training_words = weighted_words[:train_len]
 
-        for i in np.arange(num_epochs):
-            epoch_errors_data=dict()
-            np.random.shuffle(words)#
-            train_epoch_loss = 0  # Средняя ошибка по всем батчам в данной эпохе
-            can_output=output_training and (i%output_period==0 or i==num_epochs-1)
-            for j in np.arange(0, len(training_words)):  # Цикл по всем тренировочным словам, берем по 1 слову
-                batch_word = training_words[j]  # слова для создания батча
-                batch_inputs = [batch_word.point_list]
-                batch_labels = [batch_word.labels_list]
-                seq_lengths = [batch_word.length]  # Вектор длин каждой последовательности
-                inputs_arr = np.asarray(batch_inputs)
-                targets_array = np.asarray(batch_labels)
+        try:
+            for i in np.arange(num_epochs):
+                epoch_errors_data=dict()
+                np.random.shuffle(words)#
+                train_epoch_loss = 0  # Средняя ошибка по всем батчам в данной эпохе
+                can_output=output_training and (i%output_period==0 or i==num_epochs-1)
+                for j in np.arange(0, len(training_words)):  # Цикл по всем тренировочным словам, берем по 1 слову
+                    batch_word = training_words[j]  # слова для создания батча
+                    batch_inputs = [batch_word.point_list]
+                    batch_labels = [batch_word.labels_list]
+                    seq_lengths = [batch_word.length]  # Вектор длин каждой последовательности
+                    inputs_arr = np.asarray(batch_inputs)
+                    targets_array = np.asarray(batch_labels)
 
-                #TODO: переделать под переменную длину либо убрать лишнее и оставить размер батча 1
-                #entropy_weights=np.ones((self.batch_size,seq_length),dtype=np.float32)
-                #Подаем батч на вход и получаем результат
-                loss,probs,_ = session.run([self.loss,self.probs,self.train_fn],
-                                                                       feed_dict={self.inputs: inputs_arr, self.targets: targets_array,self.entropy_weights:batch_word.weights,
-                                                                                  self.seq_len: seq_lengths})
-                # loss, probs,_=session.run([self.loss, self.probs,  self.train_fn],
-                #                           feed_dict={self.inputs: inputs_arr, self.targets: targets_array,self.entropy_weights:batch_word.weights,
-                #                                      self.seq_len: seq_lengths})
-                train_epoch_loss+=loss
-                if can_output:
-                    print("word loss:", loss, " Epoch:", i,"Word:",j)
+                    #TODO: переделать под переменную длину либо убрать лишнее и оставить размер батча 1
+                    #entropy_weights=np.ones((self.batch_size,seq_length),dtype=np.float32)
+                    #Подаем батч на вход и получаем результат
+                    loss,probs,_ = session.run([self.loss,self.probs,self.train_fn],
+                                                                           feed_dict={self.inputs: inputs_arr, self.targets: targets_array,self.entropy_weights:batch_word.weights,
+                                                                                      self.seq_len: seq_lengths})
+                    # loss, probs,_=session.run([self.loss, self.probs,  self.train_fn],
+                    #                           feed_dict={self.inputs: inputs_arr, self.targets: targets_array,self.entropy_weights:batch_word.weights,
+                    #                                      self.seq_len: seq_lengths})
+                    train_epoch_loss+=loss
+                    if can_output:
+                        print("word loss:", loss, " Epoch:", i,"Word:",j)
 
-            """Конец эпохи(Прошли весь тренировочный датасет)"""
-            #Валидация
-            if validate:
-                validation_epoch_norm=0#Среднее значение нормы на эпохе для датасета валидации
-                validation_epoch_nn=0
-                validation_epoch_cost=0
-                validation_loss_sum=0
+                """Конец эпохи(Прошли весь тренировочный датасет)"""
+                #Валидация
+                if validate:
+                    validation_epoch_norm=0#Среднее значение нормы на эпохе для датасета валидации
+                    validation_epoch_nn=0
+                    validation_epoch_cost=0
+                    validation_loss_sum=0
 
-                for val_word in validation_data:#Для каждого слова валидации
-                    val_inputs_arr = np.asarray([val_word.point_list])
-                    val_targets_arr=np.asarray([val_word.labels_list])
+                    for val_word in validation_data:#Для каждого слова валидации
+                        val_inputs_arr = np.asarray([val_word.point_list])
+                        val_targets_arr=np.asarray([val_word.labels_list])
 
-                    validation_loss=session.run(self.loss,
-                                                                              feed_dict={self.inputs:val_inputs_arr,
-                                                                                         self.targets:val_targets_arr,
-                                                                                         self.seq_len:[val_word.length],
-                                                                                         self.entropy_weights:val_word.weights})
-                    validation_loss_sum+=validation_loss
-                val_feeds_len=len(validation_data)
-                validation_epoch_norm/=val_feeds_len
-                validation_epoch_cost/=val_feeds_len
-                validation_epoch_nn/=val_feeds_len
-                epoch_validation_loss=validation_loss_sum/val_feeds_len
-                epoch_errors_data["Epoch"] = i
-                epoch_errors_data["Validation loss"]=epoch_validation_loss
-                epoch_errors_data["Validation norm"]=validation_epoch_norm
-                epoch_errors_data["Validation cost"]=validation_epoch_cost
-                epoch_errors_data["Validation normalized distance"]=validation_epoch_nn
-                if i % output_period == 0 or i == num_epochs - 1:
+                        validation_loss=session.run(self.loss,
+                                                                                  feed_dict={self.inputs:val_inputs_arr,
+                                                                                             self.targets:val_targets_arr,
+                                                                                             self.seq_len:[val_word.length],
+                                                                                             self.entropy_weights:val_word.weights})
+                        validation_loss_sum+=validation_loss
+                    val_feeds_len=len(validation_data)
+                    validation_epoch_norm/=val_feeds_len
+                    validation_epoch_cost/=val_feeds_len
+                    validation_epoch_nn/=val_feeds_len
+                    epoch_validation_loss=validation_loss_sum/val_feeds_len
+                    epoch_errors_data["Epoch"] = i
+                    epoch_errors_data["Validation loss"]=epoch_validation_loss
+                    epoch_errors_data["Validation norm"]=validation_epoch_norm
+                    epoch_errors_data["Validation cost"]=validation_epoch_cost
+                    epoch_errors_data["Validation normalized distance"]=validation_epoch_nn
+                    if i % output_period == 0 or i == num_epochs - 1:
+                        if output_training:
+                            print("On validation set:")
+                            print("Epoch number:", i)
+                            print("Epoch loss:",epoch_validation_loss)
+                            print("Epoch normalized distance:",validation_epoch_nn)
+                train_epoch_loss /= len(training_words)
+                elapsed_time=time.time()-start_time
+                if i%output_period==0 or i==num_epochs-1:
                     if output_training:
-                        print("On validation set:")
-                        print("Epoch number:", i)
-                        print("Epoch loss:",epoch_validation_loss)
-                        print("Epoch normalized distance:",validation_epoch_nn)
-            train_epoch_loss /= len(training_words)
-            elapsed_time=time.time()-start_time
-            if i%output_period==0 or i==num_epochs-1:
-                if output_training:
-                    print("On training set:")
-                    print("Epoch number:",i)
-                    print(f"Epoch loss:{train_epoch_loss}")
-                    print(f"Time:{elapsed_time}")
-                epoch_errors_data["Time"]=elapsed_time
+                        print("On training set:")
+                        print("Epoch number:",i)
+                        print(f"Epoch loss:{train_epoch_loss}")
+                        print(f"Time:{elapsed_time}")
+                    epoch_errors_data["Time"]=elapsed_time
 
-                epoch_errors_data["Train loss"]=train_epoch_loss
-                epoch_errors.append(epoch_errors_data)
+                    epoch_errors_data["Train loss"]=train_epoch_loss
+                    epoch_errors.append(epoch_errors_data)
+        except KeyboardInterrupt:#Ctrl-c
+            print("Keyboard interrupt")
+        finally:
+            print("Saving training results...")
+            for train_epoch_cost in epoch_errors:
+                for k,v in train_epoch_cost.items():
+                    train_epoch_cost[k]=str(v).replace('.',',')#Заменить на запятую, чтобы excel понимал
+            #Вывод в csv-файл
+            self._csv_path=os.path.join(model_dir_path,f"{model_name}.csv")
+            if not os.path.exists(model_dir_path):
+                os.makedirs(model_dir_path)#Создать папку модели, если она не существует
 
-        for train_epoch_cost in epoch_errors:
-            for k,v in train_epoch_cost.items():
-                train_epoch_cost[k]=str(v).replace('.',',')#Заменить на запятую, чтобы excel понимал
-        #Вывод в csv-файл
-        self._csv_path=os.path.join(model_dir_path,f"{model_name}.csv")
-        if not os.path.exists(model_dir_path):
-            os.makedirs(model_dir_path)#Создать папку модели, если она не существует
-        with open(self._csv_path, 'w+',newline='') as csvfile:
-            sep=getListSeparator()#Получить разделитель для текущих настроек локали
-            headers=[]
-            if len(epoch_errors)>0:
-                headers=list(epoch_errors[0].keys())
-            csvwriter=csv.DictWriter(csvfile,fieldnames=headers,delimiter=sep)
+            with open(self._csv_path, 'w+',newline='') as csvfile:
+                sep=getListSeparator()#Получить разделитель для текущих настроек локали
+                headers=[]
+                if len(epoch_errors)>0:
+                    headers=list(epoch_errors[0].keys())
+                csvwriter=csv.DictWriter(csvfile,fieldnames=headers,delimiter=sep)
 
-            csvwriter.writeheader()
+                csvwriter.writeheader()
 
-            for i in np.arange(len(epoch_errors)):
-                data=epoch_errors[i]
-                csvwriter.writerow(data)#Записать строку в csv
-        self._checkpoint_path=os.path.join(model_dir_path, model_name)#Путь к сохраненному графу
-        saver = tf.train.Saver()
-        saver.save(session,self._checkpoint_path)
-        session.close()
+                for i in np.arange(len(epoch_errors)):
+                    data=epoch_errors[i]
+                    csvwriter.writerow(data)#Записать строку в csv
+            self._checkpoint_path=os.path.join(model_dir_path, model_name)#Путь к сохраненному графу
+            saver = tf.train.Saver()
+            saver.save(session,self._checkpoint_path)
+            session.close()
         return epoch_errors
 
     def lstm_cell(self):

@@ -1,7 +1,8 @@
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
-
+import imp
+import ctypes
 from six.moves.urllib.request import urlretrieve
 from six.moves import xrange as range
 from PointsAndRectangles import *
@@ -10,9 +11,24 @@ import sys
 import numpy as np
 from winreg import *
 from sklearn.preprocessing import normalize
+import _thread
+import win32api
 
 url = 'https://catalog.ldc.upenn.edu/desc/addenda/'
 last_percent_reported = None
+
+
+def enable_kb_interrupt():
+    # Now set our handler for CTRL_C_EVENT. Other control event
+    # types will chain to the next handler.
+    def handler(dwCtrlType, hook_sigint=_thread.interrupt_main):
+        if dwCtrlType == 0:  # CTRL_C_EVENT
+            hook_sigint()
+            return 1  # don't chain to the next handler
+        return 0  # chain to the next handler
+
+    win32api.SetConsoleCtrlHandler(handler, 1)
+
 
 def normalized_frobenius(arr1,arr2):
     diff=arr1-arr2

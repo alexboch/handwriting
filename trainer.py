@@ -1,8 +1,5 @@
-import prepare_data as pd
-import tensorflow as tf
-import numpy as np
-from utils import levenshtein
 from lstm import *
+from prepare_data import DataHelper
 from datetime import datetime
 
 class Trainer:

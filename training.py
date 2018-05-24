@@ -3,8 +3,9 @@ from trainer_builder import TrainerBuilder
 from configurator import TrainConfig
 import configurator as conf
 import tensorflow as tf
+import utils
 
-
+utils.enable_kb_interrupt()
 tf.reset_default_graph()
 #tb = TrainerBuilder(TrainConfig.BORDERS)
 tb=TrainerBuilder(TrainConfig.BORDERS)
