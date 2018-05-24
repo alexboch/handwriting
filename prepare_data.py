@@ -124,6 +124,7 @@ class DataHelper:
         raw_data=pd.read_json(filename,encoding='utf8')
         transposed_data=raw_data.T
         labeled_words=[]
+
         words_data=[]
         #Создать ключи словаря из слов всех текстов
         
@@ -153,16 +154,16 @@ class DataHelper:
                         #map(lambda p: p.split(","),points_list)
                         points_list=list(map(lambda x:list(map(float, x)),points_list))#превратить координаты в числа
                         #vectors=DataHelper.get_vectors_from_points(points_list)
-                        self.featurizer.CreateFeatures(points_list)#Вычислить признаки точек
-                        vectors=self.featurizer.GetFeatures()
-                        #vectors=points_list
-                        for j in np.arange(len(vectors)):#Цикл по всем точкам списка TODO:Исправить, чтобы не терялась последняя метка
-                            vector=vectors[j]
-                            if j!=len(vectors)-1 or len(labels_list)==1:
-                                label=labels_list[j]
-                            else:
-                                label=labels_list[j+1]
 
+                        #vectors=self.featurizer.GetFeatures()
+                        #vectors=points_list
+                        for j in np.arange(len(points_list)):#Цикл по всем точкам списка TODO:Исправить, чтобы не терялась последняя метка
+                            vector=points_list[j]
+                            # if j!=len(points_list)-1 or len(labels_list)==1:
+                            #     label=labels_list[j]
+                            # else:
+                            #     label=labels_list[j+1]
+                            label=labels_list[j]#Метка задана для каждой точки
                             if label is not None:#Если не нулевая метка
                                 is_labeled=True
                                 word_index = label['Item2']  # индекс слова в списке
@@ -172,12 +173,13 @@ class DataHelper:
                                     #integer_label=self.label_to_int(char_label)#Букву в число
                                     integer_label=self.labels_alphabet.label_to_int(char_label)
                                     tmp_words_data[word_index].labels_list.append(integer_label)
-
                                     assert(text[1].TextWords[word_index]!='')
                                 tmp_words_data[word_index].text=text[1].TextWords[word_index]#Задать строку текста
             except IndexError as index_exception:
-
                 print(index_exception)
+            for wd in tmp_words_data:
+                self.featurizer.CreateFeatures(wd.points_list)  # Вычислить признаки точек
+                wd.points_list=self.featurizer.GetFeatures()
             if is_labeled:#сохранить данные, только если в тексте есть метки
                 words_data.extend(filter(lambda w:w.text!='', tmp_words_data))
         for wd in words_data:#пройти по всем словам и сохранить данные в словарь слов по всем текстам

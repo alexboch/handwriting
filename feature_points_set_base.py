@@ -19,12 +19,12 @@ class FeaturePointsSetBase(abc.ABC):
     def _createFeatures(self,points):
         pass
 
-    def CreateFeatures(self,points):
+    def CreateFeatures(self, word_points):
         """
-        :param points:Массив точек слова, точка--кортеж (x,y) типа float
+        :param word_points:Массив точек слова, точка--кортеж (x,y) типа float
         :return:
         """
-        self.features=self._createFeatures(points)
+        self.features=self._createFeatures(word_points)
 
     pass
 

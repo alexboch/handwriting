@@ -64,7 +64,7 @@ def get_featurizer(train_config):
     if train_config==TrainConfig.BORDERS:
         return FeatureVectorsSet()
     else:
-        return FeaturePointsSetBase()
+        return FeatureVectorsSet()
 
 def make_label(symbol,index):
     return {constants.CHAR_KEY:symbol,constants.INDEX_KEY:index}
