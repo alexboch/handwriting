@@ -25,9 +25,6 @@ class LSTMDecoder:
         self.alphabet=alphabet
         pass
 
-
-
-
     def get_probabilities(self,points,model_name,model_dir):
         """
         :param points:Список входных точек
@@ -39,7 +36,6 @@ class LSTMDecoder:
         with tf.Session() as session:
             saver = tf.train.import_meta_graph(model_name)
             saver.restore(session, tf.train.latest_checkpoint(model_dir))  # Загрузить натренированную модель
-            #length = [len(points_list) for points_list in points]
             probs_list = []
             for points_list in points:
                 input_arr = np.asarray(points_list)
@@ -49,37 +45,6 @@ class LSTMDecoder:
                                                                   self.seq_len: [len(points_list)]})
                 probs_list.append(probs[0])
         return probs_list
-
-
-    def label(self, points, model_name:str, model_dir:str, symbolic=False):
-        """
-        :param points: Последовательность из последовательностей точек
-        :param model_name:имя модели
-        :param model_dir: путь к папке с сохраненной моделью
-        :param symbolic: Преобразовывать ли числовые метки в символы
-        :return:
-        """
-
-
-        model_name= os.path.join(model_dir,model_name + ".meta")
-        #session = tf.Session()
-        with tf.Session() as session:
-        #saver = tf.train.Saver()
-            saver=tf.train.import_meta_graph(model_name)
-            saver.restore(session, tf.train.latest_checkpoint(model_dir))#Загрузить натренированную модель
-            #session.run(tf.global_variables_initializer())
-            length = [len(points_list) for points_list in points]
-            decoded_list=[]
-            for points_list in points:
-                input_arr=np.asarray(points_list)
-                input_arr=np.expand_dims(input_arr,0)
-                decoded, log_prob,probs = session.run([self.decoded_integers, self.log_prob,self.probs],
-                                                feed_dict={self.inputs: input_arr, self.seq_len: [len(points_list)]})
-                arr_decoded = np.asarray(decoded.values)
-                if symbolic:
-                    arr_decoded=self.alphabet.decode_numeric_labels(arr_decoded)#Числовые метки в символьные
-                decoded_list.append(arr_decoded)
-        return np.asarray(decoded_list)
 
     TINY = 1e-6  # to avoid NaNs in logs
 
@@ -106,7 +71,6 @@ class LSTMDecoder:
             labels_arr=np.asarray(word.labels_list)
             num_for_classes=np.zeros(self.num_classes)
             for nc in range(self.num_classes):#Посчитать, сколько объектов каждого класса входит
-                #indices=np.where(labels_arr==nc)
                 num_for_classes[nc]=np.count_nonzero(labels_arr==nc)#Количество точек данного класса
             #Задать веса
             word.weights = np.ones((self.batch_size, len(word.point_list)), dtype=np.float32)
@@ -125,7 +89,7 @@ class LSTMDecoder:
         train_len=data_len#Если нет валидации, берем весь массив слов
         valid_len=0
         validate=validate and data_len>1#Если слово только 1, то валидацию следать не сможем
-        if data_len<1:
+        if data_len<=1:
             print("Dataset is too small to partition to test and validation sets!")
         if validate:
             np.random.shuffle(weighted_words)
@@ -146,16 +110,11 @@ class LSTMDecoder:
                     seq_lengths = [batch_word.length]  # Вектор длин каждой последовательности
                     inputs_arr = np.asarray(batch_inputs)
                     targets_array = np.asarray(batch_labels)
-
                     #TODO: переделать под переменную длину либо убрать лишнее и оставить размер батча 1
-                    #entropy_weights=np.ones((self.batch_size,seq_length),dtype=np.float32)
                     #Подаем батч на вход и получаем результат
                     loss,probs,_ = session.run([self.loss,self.probs,self.train_fn],
                                                                            feed_dict={self.inputs: inputs_arr, self.targets: targets_array,self.entropy_weights:batch_word.weights,
                                                                                       self.seq_len: seq_lengths})
-                    # loss, probs,_=session.run([self.loss, self.probs,  self.train_fn],
-                    #                           feed_dict={self.inputs: inputs_arr, self.targets: targets_array,self.entropy_weights:batch_word.weights,
-                    #                                      self.seq_len: seq_lengths})
                     train_epoch_loss+=loss
                     if can_output:
                         print("word loss:", loss, " Epoch:", i,"Word:",j)
@@ -290,40 +249,17 @@ class LSTMDecoder:
         self.rnn_outputs, self.rnn_state_fw,self.rnn_state_bw=tf.contrib.rnn.stack_bidirectional_dynamic_rnn(cells_fw=cells_fw, cells_bw=cells_bw, inputs=self.inputs,
                                                                                                              sequence_length=self.seq_len,
                                                               dtype=tf.float32)
-
-        #self.rnn_outputs, self.rnn_state_fw,self.output_state_bw = tf.contrib.rnn.stack_bidirectional_dynamic_rnn(self.cells_stack, self.inputs, self.seq_len,
-        #                                                        dtype=tf.float32)
-        #self.rnn_outputs, self.rnn_state_fw = tf.nn.dynamic_rnn(self.cells_stack, self.inputs, self.seq_len,
-        #                                                        dtype=tf.float32)
-        #self.rnn_outputs,self.output_state_fw,self.output_state_bw=self.create_multi_bilstm(self.num_layers,self.inputs)
-        #self.first_nn_outputs
         # Reshaping to apply the same weights over the timesteps
         self.rnn_outputs=self.rnn_outputs[-1]#Берем вывод последнего слоя
         self.rnn_outputs = tf.reshape(self.rnn_outputs, [-1, self.num_units*2])
         self.logits = tf.matmul(self.rnn_outputs, self.W) + self.b
         # Reshaping back to the original shape
         self.logits = tf.reshape(self.logits, [self.batch_size, -1, self.num_classes])
-
         # Time major
-
-        #self.logits = tf.transpose(self.logits, (1, 0, 2))#Shape: [seq_length,batch_size,num_classes]
         self.probs=tf.nn.softmax(self.logits,name='probs')#вероятность для [batch_num,t,class_num]
-        #self.loss = tf.nn.ctc_loss(self.targets, self.logits, self.seq_len,preprocess_collapse_repeated=False,ctc_merge_repeated=False)
-        #self.diff=tf.subtract(self.probs,self.targets)#Разница между целевыми и вычесленными вероятностями
-        #self.reshaped_diff=tf.reshape(self.diff,[-1])
-        #self.reshaped_diff.
         self.entropy_weights=tf.placeholder(tf.float32, [self.batch_size, None], 'entropy_weights')
         self.loss=tf.contrib.seq2seq.sequence_loss(self.logits, self.targets, self.entropy_weights)
-        #self.loss=tf.nn.sparse_softmax_cross_entropy_with_logits(labels=self.targets,logits=self.logits,name='loss')
-        #self.loss = tf.nn.ctc_loss(self.targets, self.logits, self.seq_len,preprocess_collapse_repeated=False,ctc_merge_repeated=False)
-
-        #self.cost = tf.reduce_mean(self.loss)
         self.train_fn = tf.train.MomentumOptimizer(self.learning_rate,
                                                    0.99).minimize(self.loss)
-        #self.decoded, self.log_prob = tf.nn.ctc_greedy_decoder(self.logits, self.seq_len,merge_repeated=False)
-        #self.decoded, self.log_prob = tf.nn.ctc_greedy_decoder(self.logits, self.seq_len,merge_repeated=False)
-
-        #self.decoded_integers=tf.cast(self.decoded[0], tf.int32)
         self.ler=-1
-        #self.ler = tf.reduce_mean(tf.edit_distance(self.decoded_integers, self.targets))
         pass

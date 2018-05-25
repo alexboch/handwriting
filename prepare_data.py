@@ -7,7 +7,7 @@ import constants
 from operator import methodcaller
 from sklearn.preprocessing import normalize
 from feature_points_set_base import *
-
+import pickle
 
 class LabelsAlphabet:
     """
@@ -122,6 +122,30 @@ class DataHelper:
     #     for
     #     return NotImplemented
 
+
+    def read_data(self,filaname):
+        """
+        Читает из файла обработанные данные
+        :param filaname:
+        :return:
+        """
+        try:
+            with open(filaname,mode='rb') as f:
+                self.words_dict=pickle.load(f)
+        except Exception as ex:
+            print(f"Error loading words dictionary from file:{ex}")
+
+    def save_data(self,filename):
+        """
+        Сохраняет обработанные данные слов в файл
+        :param filename:
+        :return:
+        """
+        try:
+            with open(filename,mode='wb') as f:
+                pickle.dump(self.words_dict,f)
+        except Exception as ex:
+            print(f"Error saving words dictionary to file:{ex}")
 
     def load_lds(self,filename,merged_labels=False):
         """
