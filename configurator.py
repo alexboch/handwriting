@@ -14,6 +14,7 @@ class TrainConfig(Enum):
     LETTERS=2#Метка буквы для каждого входного вектора
     LETTERS_MERGED=3#Метки букв, одинаковые буквы сливаются(распознавание слов без сегментации)
     CONNECTIONS=4
+    FRAGMENTS=5#Разделение на фрагменты
 
 class CellType(Enum):
     LSTM=1
@@ -48,6 +49,7 @@ def get_network_config(train_config):
     if train_config==TrainConfig.BORDERS:
         return NetworkConfig(num_units=512,num_layers=2,learning_rate=0.01)
     else:
+
         if train_config==TrainConfig.LETTERS_MERGED:
             return NetworkConfig(num_units=400,num_layers=1,learning_rate=1e-6)
         else:
