@@ -10,13 +10,12 @@ class LSTMDecoder:
     Класс для создания, обучения и получения разметки от LSTM-нейросети TODO:Сделать другие варианты клеток, кроме LSTM
     """
 
-    def __init__(self, num_units, num_layers, num_features, num_classes, learning_rate, batch_size,alphabet):
+    def __init__(self, num_units, num_layers, num_features, num_classes, learning_rate, batch_size):
         """
         Конструктор, в нем задаются размеры слоев и создается клетка сети
         """
         self.create_network(num_units, num_layers, num_features,
                             num_classes, learning_rate, batch_size)
-        self.alphabet=alphabet
         pass
 
     def get_probabilities(self,points,model_name,model_dir):

@@ -12,7 +12,7 @@ class TestLSTMDecoder(TestCase):
             all_chars.append(constants.NOISE_LABEL)  # Метка шума
             full_alphabet = prepdata.LabelsAlphabet(all_chars)
 
-            ld=LSTMDecoder(num_units = 20, num_layers = 1, num_features = 2, num_classes = 67, learning_rate = 1e-2, batch_size = 1,alphabet=full_alphabet)
+            ld=LSTMDecoder(num_units = 20, num_layers = 1, num_features = 2, num_classes = 67, learning_rate = 1e-2, batch_size = 1)
             train_word = prepdata.WordData()
             train_word.point_list.extend([(1, 1), (0, 0), (-1, 1), (0, 0.1)])
 

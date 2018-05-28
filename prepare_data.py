@@ -10,7 +10,7 @@ from feature_points_set_base import *
 import pickle
 import argparse
 import configurator as conf
-
+import errno
 
 class LabelsAlphabet:
     """
@@ -81,33 +81,6 @@ class DataHelper:
         return flattened_list
 
     @staticmethod
-    def get_data_vectors(points):
-        vectors=[]
-
-        return vectors
-
-    @staticmethod
-    def get_vectors_from_points(points):
-        vectors=[]#список векторов
-        if len(points)==1:
-            #points.append(points[0])#Чтобы получился вектор из одной точки
-            vectors.append([0,0])
-        #for i in np.arange(len(points)-1):
-        #    p1=points[i]#текущая точка
-        #    p2=points[i+1]#следующая точка
-        #    v=[p2[0]-p1[0],p2[1]-p1[1]]
-        #    vectors.append(v)
-        else:
-            p1=points[0]
-            for i in np.arange(1,len(points)):
-                p2=points[i]
-                v = [p2[0] - p1[0], p2[1] - p1[1]]
-                vectors.append(v)
-                p1=points[i]
-        vectors=normalize(vectors)  # нормализовать векторы
-        return vectors
-
-    @staticmethod
     def filter_nans(points,labels):
         result_labels=[]
         result_points=[]
@@ -120,7 +93,8 @@ class DataHelper:
 
     def clear(self):
         """Очищает загруженные слова"""
-
+        if self.words_dict is not None:
+            self.words_dict.clear()
 
     def read_data(self,filaname):
         """
@@ -137,14 +111,23 @@ class DataHelper:
     def save_data(self,filename):
         """
         Сохраняет обработанные данные слов в файл
-        :param filename:
+        :param filename:Полное имя файла, куда сохраняем
         :return:
         """
+        if not os.path.exists(os.path.dirname(filename)):
+            try:
+                os.makedirs(os.path.dirname(filename))
+            except OSError as exc:  # Guard against race condition
+                if exc.errno != errno.EEXIST:
+                    raise
         try:
+
             with open(filename,mode='wb') as f:
                 pickle.dump(self.words_dict,f)
+                return True
         except Exception as ex:
             print(f"Error saving words dictionary to file:{ex}")
+            return False
 
     def load_lds(self,filename,merged_labels=False):
         """
@@ -171,7 +154,7 @@ class DataHelper:
                             labels_list=self.labels_map_function(labels_list)
                         points_list=list(map(methodcaller("split",","),points_list))#разделить координаты на x и y
                         points_list=list(map(lambda x:list(map(float, x)),points_list))#превратить координаты в числа
-                        for j in np.arange(len(points_list)):#Цикл по всем точкам списка TODO:Исправить, чтобы не терялась последняя метка
+                        for j in np.arange(len(points_list)):#Цикл по всем точкам списка
                             vector=points_list[j]
 
                             label=labels_list[j]#Метка задана для каждой точки
@@ -220,40 +203,46 @@ class DataHelper:
     pass
 
 if __name__=="__main__":
-    parser=argparse.ArgumentParser(description='Reads data from lds file and saves processed data')
-    usage='Usage:prepare_data [--input [file 1,file2,...]]|[--input_dir input_dir] --config[BORDERS|LETTERS|LETTERS_MERGED|CONNECTIONS|FRAGMENTS]' \
-          '  --dir output_dir. ' \
-          'Example: py prepare_data.py --input myfile.lds myfile2.lds --config BORDERS --dir C://output_dir'
-    parser.add_argument('--input','-i',nargs='*', help='input file',required=False,default='')
-    parser.add_argument('--output','-o',type=str,help='output file')
-    parser.add_argument('--dir','-d',type=str,help='input directory')
-    parser.add_argument('--config','-c',type=str,help='train configuration',default='BORDERS')
-    args=parser.parse_args()
-    print(f"Arguments:{args}")
-    print(args.input)
-    print(args.dir)
-    has_input=args.input is not None and type(args.input) is list and len(args.input)>0
-    has_dir=args.dir is not None and args.dir!=''
-    has_config=args.config is not None and args.config!=''
-    has_output=args.output is not None and args.output!=''
-    if (not (has_input ^ has_dir)) or (not has_config) or (not has_output):#Должна быть указана одна из опций и только одна
-        print('Incorrect arguments!')
-        print(usage)
-    else:
-        config_enum=conf.TrainConfig[args.config]
-        alphabet=conf.get_alphabet(config_enum)
-        labels_mapper=conf.get_labels_mapper(config_enum)
-        featurizer=conf.get_featurizer(config_enum)
-        dh:DataHelper=DataHelper(alphabet,featurizer,labels_mapper)
-        if has_input:#Если задано одно или несколько имен файлов
-            files=args.input
-            for file in files:
-                dh.load_lds(file)
-                print(f"Text from file {file} loaded")
+    try:
+        parser=argparse.ArgumentParser(description='Reads data from lds file and saves processed data')
+        usage='Usage:prepare_data [--input [file 1,file2,...]]|[--input_dir input_dir] --config[BORDERS|LETTERS|LETTERS_MERGED|CONNECTIONS|FRAGMENTS]' \
+              '  --dir output_dir. ' \
+              'Example: py prepare_data.py --input myfile.lds myfile2.lds --config BORDERS --dir C://output_dir'
+        parser.add_argument('--input','-i',nargs='*', help='input file',required=False,default='')
+        parser.add_argument('--output','-o',type=str,help='output file')
+        parser.add_argument('--dir','-d',type=str,help='input directory')
+        parser.add_argument('--config','-c',type=str,help='train configuration',default='BORDERS')
+        args=parser.parse_args()
+        print(f"Arguments:{args}")
+        print(args.input)
+        print(args.dir)
+        has_input=args.input is not None and type(args.input) is list and len(args.input)>0
+        has_dir=args.dir is not None and args.dir!=''
+        has_config=args.config is not None and args.config!=''
+        has_output=args.output is not None and args.output!=''
+        if (not (has_input ^ has_dir)) or (not has_config) or (not has_output):#Должна быть указана одна из опций и только одна
+            print('Incorrect arguments!')
+            print(usage)
         else:
-            if has_dir:
-                dh.load_labeled_texts(args.dir)
-        #Сохранение обработанных данных в файл
-        print(f"Saving as {args.output}...")
-        dh.save_data(args.output)
-        print("Data saved")
+            config_enum=conf.TrainConfig[args.config]
+            alphabet=conf.get_alphabet(config_enum)
+            labels_mapper=conf.get_labels_mapper(config_enum)
+            featurizer=conf.get_featurizer(config_enum)
+            dh:DataHelper=DataHelper(alphabet,featurizer,labels_mapper)
+            if has_input:#Если задано одно или несколько имен файлов
+                files=args.input
+                for file in files:
+                    dh.load_lds(file)
+                    print(f"Text from file {file} loaded")
+            else:
+                if has_dir:
+                    print(f"Loading texts from directory {args.dir}")
+                    dh.load_labeled_texts(args.dir)
+                    print("All texts loaded")
+            #Сохранение обработанных данных в файл
+            print(f"Saving as {args.output}")
+            res=dh.save_data(args.output)
+            if res:
+                print("Data saved")
+    except Exception as exc:
+        print(exc)
