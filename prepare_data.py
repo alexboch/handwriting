@@ -8,6 +8,9 @@ from operator import methodcaller
 from sklearn.preprocessing import normalize
 from feature_points_set_base import *
 import pickle
+import argparse
+import configurator as conf
+
 
 class LabelsAlphabet:
     """
@@ -77,9 +80,6 @@ class DataHelper:
         flattened_list=[item for sublist in wl for item in sublist]
         return flattened_list
 
-
-
-
     @staticmethod
     def get_data_vectors(points):
         vectors=[]
@@ -118,9 +118,8 @@ class DataHelper:
         return result_points,result_labels
 
 
-    # def process_data(self,raw_data):
-    #     for
-    #     return NotImplemented
+    def clear(self):
+        """Очищает загруженные слова"""
 
 
     def read_data(self,filaname):
@@ -182,7 +181,16 @@ class DataHelper:
                                 tmp_words_data[word_index].point_list.append(vector)#сохранить данные слова по ключу
                                 if not merged_labels:
                                     char_label=label['Item1']
-                                    integer_label=self.labels_alphabet.label_to_int(char_label)
+                                    try:
+                                        integer_label=self.labels_alphabet.label_to_int(char_label)
+                                    except KeyError as kerr:
+
+                                        print(f"Key error:{kerr}")
+                                        print(f"Mapper:{self.labels_map_function}")
+                                        print(f"Labels:{labels_list}")
+                                        print(f"Alphabet:{self.labels_alphabet}")
+                                        print(f"Alphabet symbols dictionary:{self.labels_alphabet.char_to_int_dict}")
+                                        exit(1)
                                     tmp_words_data[word_index].labels_list.append(integer_label)
                                     assert(text[1].TextWords[word_index]!='')
                                 tmp_words_data[word_index].text=text[1].TextWords[word_index]#Задать строку текста
@@ -211,6 +219,38 @@ class DataHelper:
                 self.load_lds(fullpath)
     pass
 
-#dl=DataLoader();
-#data=dl.load_lds('Data//labeledTexts.lds')
-#dl.load_labeled_texts('Data')
+if __name__=="__main__":
+    parser=argparse.ArgumentParser(description='Reads data from lds file and saves processed data')
+    usage='Usage:prepare_data [--input [file 1,file2,...]]|[--input_dir input_dir] --config[BORDERS|LETTERS|LETTERS_MERGED|CONNECTIONS|FRAGMENTS]' \
+          '  --dir output_dir. ' \
+          'Example: py prepare_data.py --input myfile.lds myfile2.lds --config BORDERS --dir C://output_dir'
+    parser.add_argument('--input','-i',nargs='*', help='input file',required=False,default='')
+    parser.add_argument('--output','-o',type=str,help='output file')
+    parser.add_argument('--dir','-d',type=str,help='input directory')
+    parser.add_argument('--config','-c',type=str,help='train configuration',default='BORDERS')
+    args=parser.parse_args()
+    print(f"Arguments:{args}")
+    print(args.input)
+    print(args.dir)
+    has_input=args.input is not None and type(args.input) is list and len(args.input)>0
+    has_dir=args.dir is not None and args.dir!=''
+    has_config=args.config is not None and args.config!=''
+    if (not (has_input ^ has_dir)) or (not has_config):#Должна быть указана одна из опций и только одна
+        print('Incorrect arguments!')
+        print(usage)
+    else:
+        config_enum=conf.TrainConfig[args.config]
+        alphabet=conf.get_alphabet(config_enum)
+        labels_mapper=conf.get_labels_mapper(config_enum)
+        featurizer=conf.get_featurizer(config_enum)
+        dh:DataHelper=DataHelper(alphabet,featurizer,labels_mapper)
+        if has_input:#Если задано одно или несколько имен файлов
+            files=args.input
+            for file in files:
+                dh.load_lds(file)
+                print(f"Text from file {file} loaded")
+        else:
+            if has_dir:
+                dh.load_labeled_texts(args.dir)
+
+

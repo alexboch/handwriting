@@ -3,7 +3,6 @@ import prepare_data as prepdata
 import numpy as np
 import constants
 import tensorflow as tf
-import feauturizer_factories as ff
 from feature_vectors_set import *
 """
 В этом модуле задается соответствие между параметрами и конфигурациями

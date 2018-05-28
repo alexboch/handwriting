@@ -5,12 +5,6 @@ from utils import *
 
 map_fn = tf.map_fn
 
-
-class ValFeed:
-    def __init__self(self,points,labels,length,weights):
-
-        pass
-
 class LSTMDecoder:
     """
     Класс для создания, обучения и получения разметки от LSTM-нейросети TODO:Сделать другие варианты клеток, кроме LSTM
@@ -27,6 +21,7 @@ class LSTMDecoder:
 
     def get_probabilities(self,points,model_name,model_dir):
         """
+        Возвращает вероятностное распределение
         :param points:Список входных точек
         :param model_name:
         :param model_dir:
@@ -51,7 +46,7 @@ class LSTMDecoder:
 
     def train(self, words, num_epochs=100, output_training=False, model_name="model",model_dir_path=f"Models{os.sep}model",validate=True):
         """
-        words--Список слов, содержащих точки и метки
+        :param words: Список слов, содержащих точки и метки
         """
         os.environ['FOR_DISABLE_CONSOLE_CTRL_HANDLER'] = '1'
         words=words[0:2]
