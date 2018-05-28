@@ -235,7 +235,8 @@ if __name__=="__main__":
     has_input=args.input is not None and type(args.input) is list and len(args.input)>0
     has_dir=args.dir is not None and args.dir!=''
     has_config=args.config is not None and args.config!=''
-    if (not (has_input ^ has_dir)) or (not has_config):#Должна быть указана одна из опций и только одна
+    has_output=args.output is not None and args.output!=''
+    if (not (has_input ^ has_dir)) or (not has_config) or (not has_output):#Должна быть указана одна из опций и только одна
         print('Incorrect arguments!')
         print(usage)
     else:
@@ -252,5 +253,7 @@ if __name__=="__main__":
         else:
             if has_dir:
                 dh.load_labeled_texts(args.dir)
-
-
+        #Сохранение обработанных данных в файл
+        print(f"Saving as {args.output}...")
+        dh.save_data(args.output)
+        print("Data saved")
