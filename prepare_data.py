@@ -96,15 +96,17 @@ class DataHelper:
         if self.words_dict is not None:
             self.words_dict.clear()
 
-    def read_data(self,filaname):
+    @staticmethod
+    def read_data(filename):
         """
         Читает из файла обработанные данные
-        :param filaname:
+        :param filename:
         :return:
         """
         try:
-            with open(filaname,mode='rb') as f:
-                self.words_dict=pickle.load(f)
+            with open(filename, mode='rb') as f:
+                (num_features,num_classes,words_list)=pickle.load(f)
+                return (num_features,num_classes,words_list)
         except Exception as ex:
             print(f"Error loading words dictionary from file:{ex}")
 
@@ -121,9 +123,8 @@ class DataHelper:
                 if exc.errno != errno.EEXIST:
                     raise
         try:
-
             with open(filename,mode='wb') as f:
-                pickle.dump(self.words_dict,f)
+                pickle.dump((self.featurizer.GetNumFeatures(),self.labels_alphabet.num_chars,self.get_words_list()),f)
                 return True
         except Exception as ex:
             print(f"Error saving words dictionary to file:{ex}")

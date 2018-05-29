@@ -1,6 +1,7 @@
 import tensorflow as tf
 import csv
 import time
+import datetime
 from utils import *
 
 map_fn = tf.map_fn
@@ -10,7 +11,8 @@ class LSTMDecoder:
     Класс для создания, обучения и получения разметки от LSTM-нейросети TODO:Сделать другие варианты клеток, кроме LSTM
     """
 
-    def __init__(self, num_units, num_layers, num_features, num_classes, learning_rate, batch_size):
+
+    def __init__(self, num_units, num_layers, num_features, num_classes, learning_rate, batch_size=1):
         """
         Конструктор, в нем задаются размеры слоев и создается клетка сети
         """
@@ -48,17 +50,18 @@ class LSTMDecoder:
         :param words: Список слов, содержащих точки и метки
         """
         os.environ['FOR_DISABLE_CONSOLE_CTRL_HANDLER'] = '1'
-        words=words[0:2]
+        words=words[0:2]#TODO:убрать
         print("starting training,epochs:",num_epochs,"learning rate:",self.learning_rate)
         session = tf.Session()
         session.run(tf.global_variables_initializer())
         num_batches = len(words) / self.batch_size
         num_words = len(words)
+        total_points_num=0#Общее кол-во точек во всех образцах
         #output_period=max(num_epochs/100.0*2,1)#Выводить каждый раз, когда прошло 2% обучения
         output_period=1
         epoch_errors=[]
         start_time=time.time()
-
+        start_datetime=datetime.datetime.now()
         weighted_words=list(words)
         for word in weighted_words:
             word.length = len(word.point_list)
@@ -84,7 +87,7 @@ class LSTMDecoder:
         valid_len=0
         validate=validate and data_len>1#Если слово только 1, то валидацию следать не сможем
         if data_len<=1:
-            print("Dataset is too small to partition to test and validation sets!")
+            print("Dataset is too small to partition to train and validation sets!")
         if validate:
             np.random.shuffle(weighted_words)
             train_len=int(data_len*0.8)
@@ -102,6 +105,7 @@ class LSTMDecoder:
                     batch_inputs = [batch_word.point_list]
                     batch_labels = [batch_word.labels_list]
                     seq_lengths = [batch_word.length]  # Вектор длин каждой последовательности
+                    total_points_num+=batch_word.length
                     inputs_arr = np.asarray(batch_inputs)
                     targets_array = np.asarray(batch_labels)
                     #TODO: переделать под переменную длину либо убрать лишнее и оставить размер батча 1
@@ -111,7 +115,7 @@ class LSTMDecoder:
                                                                                       self.seq_len: seq_lengths})
                     train_epoch_loss+=loss
                     if can_output:
-                        print("word loss:", loss, " Epoch:", i,"Word:",j)
+                        print(f"Word loss:{loss}", "Epoch:", i,"Word number:",j,f"Word:{batch_word.text}")
 
                 """Конец эпохи(Прошли весь тренировочный датасет)"""
                 #Валидация
@@ -120,7 +124,6 @@ class LSTMDecoder:
                     validation_epoch_nn=0
                     validation_epoch_cost=0
                     validation_loss_sum=0
-
                     for val_word in validation_data:#Для каждого слова валидации
                         val_inputs_arr = np.asarray([val_word.point_list])
                         val_targets_arr=np.asarray([val_word.labels_list])
@@ -162,14 +165,31 @@ class LSTMDecoder:
         except KeyboardInterrupt:#Ctrl-c
             print("Keyboard interrupt")
         finally:
+            end_datetime=datetime.datetime.now()
+            print(f"Output directory:{model_dir_path}")
+            print("Saving training config...")
+            config_file_path=os.path.join(model_dir_path,'config.txt')
+            if not os.path.exists(model_dir_path):
+                os.makedirs(model_dir_path)#Создать папку модели, если она не существует
+            with open(config_file_path,'w+') as config_file:
+                config_file.write(f"Training started at {start_datetime.strftime('%H:%M:%S on %B %d, %Y')}\n")
+                config_file.write(f"Training finished at {end_datetime.strftime('%H:%M:%S on %B %d, %Y')}\n")
+                config_file.write(f"Number of training samples:{num_words}\n")
+                config_file.write(f"Total number of points:{total_points_num}\n")
+                config_file.write("--Neural net configuration--\n")
+                config_file.write(f"Number of layers:{self.num_layers}\n")
+                config_file.write(f"Number of units:{self.num_units}\n")
+                config_file.write(f"Learning rate{self.learning_rate}\n")
+
             print("Saving training results...")
             for train_epoch_cost in epoch_errors:
                 for k,v in train_epoch_cost.items():
                     train_epoch_cost[k]=str(v).replace('.',',')#Заменить на запятую, чтобы excel понимал
+
+
             #Вывод в csv-файл
             self._csv_path=os.path.join(model_dir_path,f"{model_name}.csv")
-            if not os.path.exists(model_dir_path):
-                os.makedirs(model_dir_path)#Создать папку модели, если она не существует
+
 
             with open(self._csv_path, 'w+',newline='') as csvfile:
                 sep=getListSeparator()#Получить разделитель для текущих настроек локали
@@ -186,6 +206,7 @@ class LSTMDecoder:
             self._checkpoint_path=os.path.join(model_dir_path, model_name)#Путь к сохраненному графу
             saver = tf.train.Saver()
             saver.save(session,self._checkpoint_path)
+            print("Training result saved")
             session.close()
         return epoch_errors
 
