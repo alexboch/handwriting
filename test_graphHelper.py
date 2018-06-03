@@ -90,8 +90,8 @@ class TestGraphHelper(TestCase):
 
     pass
 
+
     def test_freeze_graph(self):
         GraphHelper.freeze_graph('Data\\BORDERS10-05-2018-01_17_02\\','probs')
         graph=GraphHelper.load_graph('Data\\BORDERS10-05-2018-01_17_02\\frozen_model.pb')
-
         self.fail()

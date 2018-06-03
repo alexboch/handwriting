@@ -25,9 +25,7 @@ class TestLSTMDecoder(TestCase):
             test_word.point_list.extend([(0, 0), (-1, 0.99)])
             test_word.labels_list.extend(['и', 'а'])
             test_word.labels_list = full_alphabet.encode_char_labels(test_word.labels_list)
-
             true_probs=full_alphabet.one_hot(test_word.labels_list)
-
             probs=ld.get_probabilities([test_word.point_list],model_name='small_test',model_dir=model_path)
             #probs[0][0].shape == np.asarray(true_probs).shape
             true_probs_arr=np.asarray(true_probs)

@@ -3,6 +3,7 @@ import csv
 import time
 import datetime
 from utils import *
+from graph_helper import GraphHelper
 
 map_fn = tf.map_fn
 
@@ -18,6 +19,7 @@ class LSTMDecoder:
         """
         self.create_network(num_units, num_layers, num_features,
                             num_classes, learning_rate, batch_size)
+
         pass
 
     def get_probabilities(self,points,model_name,model_dir):
@@ -45,12 +47,12 @@ class LSTMDecoder:
     TINY = 1e-6  # to avoid NaNs in logs
 
 
-    def train(self, words, num_epochs=100, output_training=False, model_name="model",model_dir_path=f"Models{os.sep}model",validate=True):
+    def train(self, words, num_epochs=100, output_training=False, model_name="model",model_dir_path=f"Models{os.sep}model",validate=True,keep_prob=0.5):
         """
         :param words: Список слов, содержащих точки и метки
         """
         os.environ['FOR_DISABLE_CONSOLE_CTRL_HANDLER'] = '1'
-        words=words[0:2]#TODO:убрать
+        #words=words[0:2]#TODO:убрать
         print("starting training,epochs:",num_epochs,"learning rate:",self.learning_rate)
         session = tf.Session()
         session.run(tf.global_variables_initializer())
@@ -112,7 +114,8 @@ class LSTMDecoder:
                     #Подаем батч на вход и получаем результат
                     loss,probs,_ = session.run([self.loss,self.probs,self.train_fn],
                                                                            feed_dict={self.inputs: inputs_arr, self.targets: targets_array,self.entropy_weights:batch_word.weights,
-                                                                                      self.seq_len: seq_lengths})
+                                                                                      self.seq_len: seq_lengths,self.keep_prob:keep_prob,
+                                                                                      })
                     train_epoch_loss+=loss
                     if can_output:
                         print(f"Word loss:{loss}", "Epoch:", i,"Word number:",j,f"Word:{batch_word.text}")
@@ -132,7 +135,8 @@ class LSTMDecoder:
                                                                                   feed_dict={self.inputs:val_inputs_arr,
                                                                                              self.targets:val_targets_arr,
                                                                                              self.seq_len:[val_word.length],
-                                                                                             self.entropy_weights:val_word.weights})
+                                                                                             self.entropy_weights:val_word.weights,
+                                                                                             self.keep_prob:1.0})
                         validation_loss_sum+=validation_loss
                     val_feeds_len=len(validation_data)
                     validation_epoch_norm/=val_feeds_len
@@ -190,22 +194,22 @@ class LSTMDecoder:
             #Вывод в csv-файл
             self._csv_path=os.path.join(model_dir_path,f"{model_name}.csv")
 
-
             with open(self._csv_path, 'w+',newline='') as csvfile:
                 sep=getListSeparator()#Получить разделитель для текущих настроек локали
                 headers=[]
                 if len(epoch_errors)>0:
                     headers=list(epoch_errors[0].keys())
                 csvwriter=csv.DictWriter(csvfile,fieldnames=headers,delimiter=sep)
-
                 csvwriter.writeheader()
-
                 for i in np.arange(len(epoch_errors)):
                     data=epoch_errors[i]
                     csvwriter.writerow(data)#Записать строку в csv
             self._checkpoint_path=os.path.join(model_dir_path, model_name)#Путь к сохраненному графу
             saver = tf.train.Saver()
             saver.save(session,self._checkpoint_path)
+            print("Freezing graph...")
+            GraphHelper.freeze_graph(model_dir_path,'probs')
+            print("Graph freezing finished")
             print("Training result saved")
             session.close()
         return epoch_errors
@@ -237,6 +241,7 @@ class LSTMDecoder:
         self.num_layers = num_layers
         self.learning_rate = learning_rate
         self.inputs = tf.placeholder(tf.float32, [None, None, num_features], name='inputs')
+        self.keep_prob=tf.placeholder(tf.float32)#Вероятность, что выходной нейрон остается
         self.num_classes = num_classes
         self.num_features=num_features
         self.batch_size = batch_size
@@ -248,6 +253,7 @@ class LSTMDecoder:
         self.W = tf.Variable(
             tf.truncated_normal([self.num_units*2, self.num_classes], stddev=0.1),name='W')  # Начальная матрица весов, домножается на 2, т.к. сеть двунаправленная
         self.b = tf.Variable(tf.constant(0., shape=[self.num_classes]),name='b')
+
 
 
         # 1d array of size [batch_size]
@@ -267,7 +273,12 @@ class LSTMDecoder:
         # Reshaping to apply the same weights over the timesteps
         self.rnn_outputs=self.rnn_outputs[-1]#Берем вывод последнего слоя
         self.rnn_outputs = tf.reshape(self.rnn_outputs, [-1, self.num_units*2])
+
         self.logits = tf.matmul(self.rnn_outputs, self.W) + self.b
+
+        # self.logits=tf.cond(tf.equal(self.dropout_enabled,tf.constant(True)),lambda: tf.nn.dropout(self.logits,self.keep_prob),
+        #                     lambda :self.logits)#Проверяем, задан ли дропаут
+        self.logits=tf.nn.dropout(self.logits, self.keep_prob)
         # Reshaping back to the original shape
         self.logits = tf.reshape(self.logits, [self.batch_size, -1, self.num_classes])
         # Time major

@@ -62,9 +62,9 @@ def get_model_name(train_config):
 
 def get_featurizer(train_config):
     if train_config==TrainConfig.BORDERS:
-        return FeatureVectorsSet()
+        return FeatureVectorsSetFull()
     else:
-        return FeatureVectorsSet()
+        return FeatureVectorsSetFull()
 
 def make_label(symbol,index):
     return {constants.CHAR_KEY:symbol,constants.INDEX_KEY:index}

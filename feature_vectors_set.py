@@ -3,7 +3,7 @@ from sklearn.preprocessing import normalize
 import utils
 
 
-class FeatureVectorsSet(FeaturePointsSetBase):
+class FeatureVectorsSetFull(FeaturePointsSetBase):
 
     def GetNumFeatures(self):
         return 5
@@ -11,7 +11,7 @@ class FeatureVectorsSet(FeaturePointsSetBase):
 
 
 
-    def MapToPointLabels(self, points, pointwise_labels):
+    def MapToPointLabels(self, points, vector_labels):
         return NotImplemented
 
 
@@ -19,12 +19,14 @@ class FeatureVectorsSet(FeaturePointsSetBase):
         mapped_labels=[]
         l=len(points)
         for i in range(l-1):#Векторов на 1 меньше, чем точек
-            if i!=l-2:#Считаем, что метка последнего вектора равна последней точке
+            if i!=l-2:#Считаем, что метка последнего вектора равна метке последней точки
                 label=pointwise_labels[i]
             else:
                 label=pointwise_labels[i+1]
             mapped_labels.append(label)
         return mapped_labels
+
+
 
     def _createFeatures(self,points):
         features_list=[]

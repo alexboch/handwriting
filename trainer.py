@@ -14,7 +14,6 @@ class Trainer:
         self.data_loader=data_loader
         self.output_training=output_training
         self.model_dir_path=f"{data_directory}{os.sep}{model_name}"
-
         pass
 
     def load_data(self):
@@ -52,7 +51,7 @@ class Trainer:
         test= test and data_len > 1
         if test:
             np.random.shuffle(training_data)
-            # Разделить на валидационное и тренировочное множества в отношении 20 на 80
+            # Разделить на тестовое и тренировочное множества в отношении 20 на 80
             test_len=int(data_len * 0.2)#20% на тест
             train_len= data_len - test_len#80 на обучение
             test_data= training_data[:test_len]
