@@ -2,6 +2,7 @@ import tensorflow as tf
 import csv
 import time
 import datetime
+import json
 from utils import *
 from graph_helper import GraphHelper
 
@@ -13,14 +14,31 @@ class LSTMDecoder:
     """
 
 
-    def __init__(self, num_units, num_layers, num_features, num_classes, learning_rate, batch_size=1):
+    #def __init__(self, num_units, num_layers, num_features, num_classes, learning_rate, batch_size=1):
+    def __init__(self,**kwargs):
         """
         Конструктор, в нем задаются размеры слоев и создается клетка сети
         """
+        num_units=kwargs.get('num_units',250)
+        num_layers=kwargs.get('num_layers',2)
+        num_features=kwargs.pop('num_features')
+        learning_rate=kwargs.get('learning_rate',1e-2)
+        batch_size=kwargs.get('batch_size',1)
+        num_classes=kwargs.pop('num_classes')
         self.create_network(num_units, num_layers, num_features,
                             num_classes, learning_rate, batch_size)
+    @staticmethod
+    def from_file(file_path):
+        with open(file_path,'r') as conf_file:
+            conf_dict=json.load(conf_file)
+            return LSTMDecoder(**conf_dict)
 
-        pass
+    def save_net_config(self,path):
+        conf_dict = {'num_layers': self.num_layers, 'num_units': self.num_units,
+                     'learning_rate': self.learning_rate, 'num_classes': self.num_classes,
+                     'num_features': self.num_features}
+        with open(path, 'w') as net_config_file:
+            json.dump(conf_dict, net_config_file)
 
     def get_probabilities(self,points,model_name,model_dir):
         """
@@ -182,6 +200,7 @@ class LSTMDecoder:
             config_file_path=os.path.join(model_dir_path,'config.txt')
             if not os.path.exists(model_dir_path):
                 os.makedirs(model_dir_path)#Создать папку модели, если она не существует
+
             with open(config_file_path,'w+') as config_file:
                 config_file.write(f"Training started at {start_datetime.strftime('%H:%M:%S on %B %d, %Y')}\n")
                 config_file.write(f"Training finished at {end_datetime.strftime('%H:%M:%S on %B %d, %Y')}\n")
@@ -191,7 +210,11 @@ class LSTMDecoder:
                 config_file.write(f"Number of layers:{self.num_layers}\n")
                 config_file.write(f"Number of units:{self.num_units}\n")
                 config_file.write(f"Learning rate{self.learning_rate}\n")
-
+                print("Training config saved")
+            print("Saving network config...")
+            net_config_file_path = os.path.join(model_dir_path, 'net_config.json')
+            self.save_net_config(net_config_file_path)
+            print("network config saved...")
             print("Saving training results...")
             for train_epoch_cost in epoch_errors:
                 for k,v in train_epoch_cost.items():
@@ -260,8 +283,6 @@ class LSTMDecoder:
         self.W = tf.Variable(
             tf.truncated_normal([self.num_units*2, self.num_classes], stddev=0.1),name='W')  # Начальная матрица весов, домножается на 2, т.к. сеть двунаправленная
         self.b = tf.Variable(tf.constant(0., shape=[self.num_classes]),name='b')
-
-
 
         # 1d array of size [batch_size]
         self.seq_len = tf.placeholder(tf.int32, [None], name='seq_len')
