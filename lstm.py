@@ -47,7 +47,8 @@ class LSTMDecoder:
     TINY = 1e-6  # to avoid NaNs in logs
 
 
-    def train(self, words, num_epochs=100, output_training=False, model_name="model",model_dir_path=f"Models{os.sep}model",validate=True,keep_prob=0.5):
+    def train(self, words, num_epochs=100, output_training=False, model_name="model",
+              model_dir_path=f"Models{os.sep}model",validate=True,keep_prob=0.5,model_load_path=None):
         """
         :param words: Список слов, содержащих точки и метки
         """
@@ -55,7 +56,13 @@ class LSTMDecoder:
         #words=words[0:2]#TODO:убрать
         print("starting training,epochs:",num_epochs,"learning rate:",self.learning_rate)
         session = tf.Session()
-        session.run(tf.global_variables_initializer())
+        if model_load_path is not None:#Если задан путь, то загрузить и дотренировать
+            load_dir=os.path.dirname(model_load_path)
+            saver=tf.train.import_meta_graph(model_load_path)
+            saver.restore(session,tf.train.latest_checkpoint(load_dir))
+            pass
+        else:
+            session.run(tf.global_variables_initializer())
         num_batches = len(words) / self.batch_size
         num_words = len(words)
         total_points_num=0#Общее кол-во точек во всех образцах
