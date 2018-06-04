@@ -12,8 +12,6 @@ class LSTMDecoder:
     """
     Класс для создания, обучения и получения разметки от LSTM-нейросети TODO:Сделать другие варианты клеток, кроме LSTM
     """
-
-
     #def __init__(self, num_units, num_layers, num_features, num_classes, learning_rate, batch_size=1):
     def __init__(self,**kwargs):
         """
@@ -73,12 +71,18 @@ class LSTMDecoder:
         os.environ['FOR_DISABLE_CONSOLE_CTRL_HANDLER'] = '1'
         #words=words[0:2]#TODO:убрать
         print("starting training,epochs:",num_epochs,"learning rate:",self.learning_rate)
+        last_epoch_num=0
         session = tf.Session()
+        epoch_errors = []
         if model_load_path is not None:#Если задан путь, то загрузить и дотренировать
             load_dir=os.path.dirname(model_load_path)
+            model_name=os.path.splitext(model_load_path)
             saver=tf.train.import_meta_graph(model_load_path)
             saver.restore(session,tf.train.latest_checkpoint(load_dir))
-            pass
+            csv_path=os.path.join(load_dir,f"{model_name}.csv")
+            epochs_file=csv.DictReader(open(csv_path))
+            epoch_errors=list(epochs_file)#В список словарей
+            last_epoch_num=epoch_errors[-1]["Epoch"]
         else:
             session.run(tf.global_variables_initializer())
         num_batches = len(words) / self.batch_size
@@ -86,7 +90,7 @@ class LSTMDecoder:
         total_points_num=0#Общее кол-во точек во всех образцах
         #output_period=max(num_epochs/100.0*2,1)#Выводить каждый раз, когда прошло 2% обучения
         output_period=1
-        epoch_errors=[]
+
         start_time=time.time()
         start_datetime=datetime.datetime.now()
         weighted_words=list(words)
@@ -123,6 +127,7 @@ class LSTMDecoder:
 
         try:
             for i in np.arange(num_epochs):
+                epoch_num=last_epoch_num+i
                 epoch_errors_data=dict()
                 np.random.shuffle(words)#
                 train_epoch_loss = 0  # Средняя ошибка по всем батчам в данной эпохе
@@ -143,7 +148,7 @@ class LSTMDecoder:
                                                                                       })
                     train_epoch_loss+=loss
                     if can_output:
-                        print(f"Word loss:{loss}", "Epoch:", i,"Word number:",j,f"Word:{batch_word.text}")
+                        print(f"Word loss:{loss}", "Epoch:", epoch_num,"Word number:",j,f"Word:{batch_word.text}")
 
                 """Конец эпохи(Прошли весь тренировочный датасет)"""
                 #Валидация
@@ -168,7 +173,7 @@ class LSTMDecoder:
                     validation_epoch_cost/=val_feeds_len
                     validation_epoch_nn/=val_feeds_len
                     epoch_validation_loss=validation_loss_sum/val_feeds_len
-                    epoch_errors_data["Epoch"] = i
+                    epoch_errors_data["Epoch"] = epoch_num
                     epoch_errors_data["Validation loss"]=epoch_validation_loss
                     epoch_errors_data["Validation norm"]=validation_epoch_norm
                     epoch_errors_data["Validation cost"]=validation_epoch_cost
@@ -176,7 +181,7 @@ class LSTMDecoder:
                     if i % output_period == 0 or i == num_epochs - 1:
                         if output_training:
                             print("On validation set:")
-                            print("Epoch number:", i)
+                            print("Epoch number:", epoch_num)
                             print("Epoch loss:",epoch_validation_loss)
                             print("Epoch normalized distance:",validation_epoch_nn)
                 train_epoch_loss /= len(training_words)
@@ -184,11 +189,10 @@ class LSTMDecoder:
                 if i%output_period==0 or i==num_epochs-1:
                     if output_training:
                         print("On training set:")
-                        print("Epoch number:",i)
+                        print("Epoch number:",epoch_num)
                         print(f"Epoch loss:{train_epoch_loss}")
                         print(f"Time:{elapsed_time}")
                     epoch_errors_data["Time"]=elapsed_time
-
                     epoch_errors_data["Train loss"]=train_epoch_loss
                     epoch_errors.append(epoch_errors_data)
         except KeyboardInterrupt:#Ctrl-c
@@ -219,11 +223,8 @@ class LSTMDecoder:
             for train_epoch_cost in epoch_errors:
                 for k,v in train_epoch_cost.items():
                     train_epoch_cost[k]=str(v).replace('.',',')#Заменить на запятую, чтобы excel понимал
-
-
             #Вывод в csv-файл
             self._csv_path=os.path.join(model_dir_path,f"{model_name}.csv")
-
             with open(self._csv_path, 'w+',newline='') as csvfile:
                 sep=getListSeparator()#Получить разделитель для текущих настроек локали
                 headers=[]

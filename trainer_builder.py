@@ -26,8 +26,9 @@ class TrainerBuilder:
             self.num_classes=self.alphabet.get_length()#Для всех символов
             self.num_epochs=conf.get_num_epochs(init_config)
             self.num_features=self.featurizer.GetNumFeatures()
-            self.network=LSTMDecoder(self.net_config.num_units,self.net_config.num_layers,self.num_features,self.num_classes,
-                                self.net_config.learning_rate,self.net_config.batch_size)
+            self.network=LSTMDecoder(num_units=self.net_config.num_units,num_layers=self.net_config.num_layers,
+                                     num_features=self.num_features,num_classes=self.num_classes,
+                                learning_rate=self.net_config.learning_rate,batch_size=self.net_config.batch_size)
             self.model_name=conf.get_model_name(init_config)
             self.data_dir=conf.get_data_directory(init_config)
             self.data_loader=pd.DataHelper(self.alphabet,self.featurizer,labels_map_function=self.labels_mapper)

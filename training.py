@@ -26,7 +26,9 @@ if __name__=='__main__':
     if has_input and has_output_dir:
         (num_features,num_classes,train_data)=DataHelper.read_data(args.input)#Читаем из файла кол-во признаков, классов и данные
         print("Data loaded")
-        lstm:LSTMDecoder=LSTMDecoder(args.num_units,args.num_layers,num_features,num_classes,args.learning_rate)
+        lstm:LSTMDecoder=LSTMDecoder(num_units=args.num_units,num_layers=args.num_layers,
+                                     num_features=num_features,num_classes=num_classes,
+                                     learning_rate=args.learning_rate)
         print("LSTM Network created")
         lstm.train(train_data,num_epochs=args.num_epochs,output_training=args.output_training,model_dir_path=args.output_dir,validate=args.validate)
     pass
