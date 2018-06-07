@@ -4,6 +4,9 @@ import numpy as np
 import constants
 import tensorflow as tf
 from feature_vectors_set import *
+import labels_converter as lc
+import data_filters as dc
+
 """
 В этом модуле задается соответствие между параметрами и конфигурациями
 """
@@ -26,6 +29,11 @@ class NetworkConfig:
         self.num_layers=num_layers
         self.learning_rate=learning_rate
         self.batch_size=batch_size
+
+def get_labels_filter(train_config):
+    if train_config==TrainConfig.FRAGMENTS:
+        return dc.num_filter
+    return None
 
 def get_num_epochs(train_config):
     """
@@ -55,7 +63,10 @@ def get_network_config(train_config):
             if train_config==TrainConfig.LETTERS:
                 return NetworkConfig(512,2,1e-3)
             else:
-                return NetworkConfig(500,1,1e-8)
+                if train_config==TrainConfig.FRAGMENTS:
+                    return NetworkConfig(num_units=512, num_layers=2, learning_rate=0.01)
+                else:
+                    return NetworkConfig(500,1,1e-8)
 
 def get_model_name(train_config):
     return train_config.name
@@ -119,6 +130,7 @@ def get_alphabet(train_config):
 
     if train_config is TrainConfig.BORDERS or train_config is TrainConfig.CONNECTIONS:
         chars=[constants.CONNECTION_LABEL,constants.NOISE_LABEL]
+        return prepdata.LettersAlphabet(chars)
     else:
         if train_config is TrainConfig.LETTERS or train_config is TrainConfig.LETTERS_MERGED:
             chars=[chr(x+1040) for x in range(65)]#Русский алфавит в UTF-8
@@ -126,9 +138,14 @@ def get_alphabet(train_config):
             chars.append('ё')
             chars.append(constants.CONNECTION_LABEL)
             chars.append(constants.NOISE_LABEL)
+            return prepdata.LettersAlphabet(chars)
         else:
-            chars = [constants.CONNECTION_LABEL, constants.NOISE_LABEL]
-    return prepdata.LabelsAlphabet(chars)
+            if train_config is TrainConfig.FRAGMENTS:
+                return prepdata.NumbersAlphabet(128)
+            else:
+                chars = [constants.CONNECTION_LABEL, constants.NOISE_LABEL]
+                return prepdata.LettersAlphabet(chars)
+    #return prepdata.LettersAlphabet(chars)
 
 def get_labels_mapper(train_config):
     if train_config==TrainConfig.BORDERS:
@@ -138,3 +155,8 @@ def get_labels_mapper(train_config):
             return connections_only_mapper
         else:
             return None
+
+def get_labels_converter(train_config):
+    if train_config==TrainConfig.FRAGMENTS:
+        return lc.BinLabelsConverter()
+    return None

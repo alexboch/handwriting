@@ -10,7 +10,7 @@ class TestLSTMDecoder(TestCase):
             all_chars = [chr(x + 1040) for x in range(65)]  # Все символы русского алфавита
             all_chars.append(constants.CONNECTION_LABEL)  # Метка соединения
             all_chars.append(constants.NOISE_LABEL)  # Метка шума
-            full_alphabet = prepdata.LabelsAlphabet(all_chars)
+            full_alphabet = prepdata.LettersAlphabet(all_chars)
 
             ld=LSTMDecoder(num_units = 20, num_layers = 1, num_features = 2, num_classes = 67, learning_rate = 1e-2, batch_size = 1)
             train_word = prepdata.WordData()

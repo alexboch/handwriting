@@ -11,8 +11,29 @@ import pickle
 import argparse
 import configurator as conf
 import errno
+from abc import ABC,abstractmethod
+from labels_converter import *
 
-class LabelsAlphabet:
+class LabelsAlphabet(ABC):
+    @abstractmethod
+    def label_to_int(self,char_label):
+        ...
+
+    @abstractmethod
+    def int_label_to_char(self,int_label):
+        ...
+
+    def decode_numeric_labels(self,int_labels):
+        return [self.int_label_to_char(x) for x in int_labels]
+
+    def encode_char_labels(self,char_labels):
+        return [self.label_to_int(x) for x in char_labels]
+
+    @abstractmethod
+    def get_length(self):
+        ...
+
+class LettersAlphabet(LabelsAlphabet):
     """
     Содержит методы преобразования между числовыми метками и буквенными
     """
@@ -23,8 +44,6 @@ class LabelsAlphabet:
         for i in np.arange(self.num_chars):
             self.int_to_char_dict[i]=characters[i]
             self.char_to_int_dict[characters[i]]=i
-
-
 
 
     def one_hot(self,labels):
@@ -51,6 +70,25 @@ class LabelsAlphabet:
     def get_length(self):
         return len(self.char_to_int_dict)
 
+class NumbersAlphabet(LabelsAlphabet):
+    """
+    Алфавит, в котором метки изначально представляют собой номера классов в строковом представлении
+    """
+
+
+    def __init__(self,num_classes):
+        self.num_classes=num_classes
+
+    def label_to_int(self, char_label):
+        return int(char_label)
+
+    def int_label_to_char(self, int_label):
+        return str(int_label)
+
+    def get_length(self):
+        return self.num_classes
+
+
 class WordData:#TODO:Добавить координаты точек
     """
     Класс слова, содержащий список точек и меток
@@ -60,15 +98,19 @@ class WordData:#TODO:Добавить координаты точек
         self.labels_list=[]
         self.text=""
 
-        
 class DataHelper:
-    
     #Словарь с точками слов и метками
     words_dict={}
-    def __init__(self, labels_alphabet:LabelsAlphabet, featurizer:FeaturePointsSetBase, labels_map_function=None):
+    def __init__(self, labels_alphabet:LettersAlphabet, featurizer:FeaturePointsSetBase, labels_map_function=None, labels_converter:LabelsConverter=None,data_filter=None):
         self.labels_alphabet=labels_alphabet
         self.featurizer=featurizer
         self.labels_map_function=labels_map_function
+        self.labels_converter=labels_converter
+        self.data_filter=data_filter
+        if self.labels_converter is not None:
+            self.num_outputs=self.labels_converter.get_num_outputs()
+        else:
+            self.num_outputs=self.labels_alphabet.get_length()
         return
 
     LastCode=1105#Код буквы ё, последней в UTF-8
@@ -124,7 +166,8 @@ class DataHelper:
                     raise
         try:
             with open(filename,mode='wb') as f:
-                pickle.dump((self.featurizer.GetNumFeatures(),self.labels_alphabet.num_chars,self.get_words_list()),f)
+                print(f"Total words:{len(self.get_words_list())}")
+                pickle.dump((self.featurizer.GetNumFeatures(),self.num_outputs,self.get_words_list()),f)
                 return True
         except Exception as ex:
             print(f"Error saving words dictionary to file:{ex}")
@@ -150,6 +193,8 @@ class DataHelper:
             try:
                 for i in np.arange(len(pl.PointLists)):#Цикл по всем спискам точек
                     points_list,labels_list=DataHelper.filter_nans(pl.PointLists[i],pl.Labels[i])
+                    if self.data_filter is not None:#Отфильтровать точки
+                        points_list,labels_list=self.data_filter(points_list,labels_list)
                     if len(points_list)>0:#Если есть хоть одна метка
                         if self.labels_map_function is not None:
                             labels_list=self.labels_map_function(labels_list)
@@ -183,6 +228,8 @@ class DataHelper:
             for wd in tmp_words_data:
                 if wd.point_list is not None and len(wd.point_list)>0:
                     wd.labels_list=self.featurizer.MapToVectorLabels(wd.point_list,wd.labels_list)
+                    if self.labels_converter is not None:
+                        wd.labels_list=self.labels_converter.convert_labels(wd.labels_list)
                     self.featurizer.CreateFeatures(wd.point_list)  # Вычислить признаки точек
                     wd.point_list=self.featurizer.GetFeatures()
             if is_labeled:#сохранить данные, только если в тексте есть метки
@@ -216,7 +263,7 @@ if __name__=="__main__":
         args=parser.parse_args()
         print(f"Arguments:{args}")
         print(args.input)
-        print(args.dir)
+        print(f"Directory:{args.dir}")
         has_input=args.input is not None and type(args.input) is list and len(args.input)>0
         has_dir=args.dir is not None and args.dir!=''
         has_config=args.config is not None and args.config!=''
@@ -229,7 +276,9 @@ if __name__=="__main__":
             alphabet=conf.get_alphabet(config_enum)
             labels_mapper=conf.get_labels_mapper(config_enum)
             featurizer=conf.get_featurizer(config_enum)
-            dh:DataHelper=DataHelper(alphabet,featurizer,labels_mapper)
+            labels_converter=conf.get_labels_converter(config_enum)
+            data_filter=conf.get_labels_filter(config_enum)
+            dh:DataHelper=DataHelper(alphabet,featurizer,labels_mapper,labels_converter,data_filter)
             if has_input:#Если задано одно или несколько имен файлов
                 files=args.input
                 for file in files:
@@ -246,4 +295,4 @@ if __name__=="__main__":
             if res:
                 print("Data saved")
     except Exception as exc:
-        print(exc)
+        print(f"Exception:{exc}")

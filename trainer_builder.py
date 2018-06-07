@@ -13,9 +13,8 @@ class TrainerBuilder:
     """
 
     def create_alphabet_from_chars(self, characters):
-        alphabet=pd.LabelsAlphabet(characters)
+        alphabet=pd.LettersAlphabet(characters)
         self._trainer.alphabet=alphabet
-
 
     def __init__(self,init_config=None):
         if init_config!=None:
@@ -34,7 +33,6 @@ class TrainerBuilder:
             self.data_loader=pd.DataHelper(self.alphabet,self.featurizer,labels_map_function=self.labels_mapper)
             #self._trainer = tr.Trainer(self.network, self.data_loader, self.num_epochs, self.model_name, self.data_dir, True)
         pass
-
 
     #def set_featurizer(self,ft_set):
 

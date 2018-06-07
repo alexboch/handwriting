@@ -17,6 +17,7 @@ class LSTMDecoder:
         """
         Конструктор, в нем задаются размеры слоев и создается клетка сети
         """
+        print(f"Network constructor parameters:\n{kwargs}")
         num_units=kwargs.get('num_units',250)
         num_layers=kwargs.get('num_layers',2)
         num_features=kwargs.pop('num_features')
@@ -25,6 +26,7 @@ class LSTMDecoder:
         num_classes=kwargs.pop('num_classes')
         self.create_network(num_units, num_layers, num_features,
                             num_classes, learning_rate, batch_size)
+
     @staticmethod
     def from_file(file_path):
         with open(file_path,'r') as conf_file:
@@ -33,8 +35,7 @@ class LSTMDecoder:
 
     def save_net_config(self,path):
         conf_dict = {'num_layers': self.num_layers, 'num_units': self.num_units,
-                     'learning_rate': self.learning_rate, 'num_classes': self.num_classes,
-                     'num_features': self.num_features}
+                     'learning_rate': self.learning_rate }
         with open(path, 'w') as net_config_file:
             json.dump(conf_dict, net_config_file)
 
@@ -61,7 +62,6 @@ class LSTMDecoder:
         return probs_list
 
     TINY = 1e-6  # to avoid NaNs in logs
-
 
     def train(self, words, num_epochs=100, output_training=False, model_name="model",
               model_dir_path=f"Models{os.sep}model",validate=True,keep_prob=0.5,model_load_path=None):
@@ -97,19 +97,19 @@ class LSTMDecoder:
         for word in weighted_words:
             word.length = len(word.point_list)
             labels_arr=np.asarray(word.labels_list)
-            num_for_classes=np.zeros(self.num_classes)
-            for nc in range(self.num_classes):#Посчитать, сколько объектов каждого класса входит
+            num_for_classes=np.zeros(self.num_outputs)
+            for nc in range(self.num_outputs):#Посчитать, сколько объектов каждого класса входит
                 num_for_classes[nc]=np.count_nonzero(labels_arr==nc)#Количество точек данного класса
             #Задать веса
             word.weights = np.ones((self.batch_size, len(word.point_list)), dtype=np.float32)
-            class_weights=np.ones(self.num_classes)
+            class_weights=np.ones(self.num_outputs)
             n0=num_for_classes[np.where(num_for_classes>0)][0]
             i=0
             for ni in num_for_classes:
                 x=n0/ni
                 class_weights[i]=x
                 i+=1
-            for j in range(self.num_classes):
+            for j in range(self.num_outputs):
                 class_mask=(labels_arr==j)
                 word.weights[0][class_mask]=class_weights[j]
 
@@ -267,13 +267,13 @@ class LSTMDecoder:
         return tf.contrib.rnn.stack_bidirectional_dynamic_rnn(cells_fw=cells_fw,cells_bw=cells_bw,inputs=inputs, dtype=tf.float32)
 
 
-    def create_network(self, num_units, num_layers, num_features, num_classes, learning_rate, batch_size=10):
+    def create_network(self, num_units, num_layers, num_features, num_outputs, learning_rate, batch_size=10):
         self.num_units = num_units
         self.num_layers = num_layers
         self.learning_rate = learning_rate
         self.inputs = tf.placeholder(tf.float32, [None, None, num_features], name='inputs')
         self.keep_prob=tf.placeholder(tf.float32)#Вероятность, что выходной нейрон остается
-        self.num_classes = num_classes
+        self.num_outputs = num_outputs
         self.num_features=num_features
         self.batch_size = batch_size
         shape = tf.shape(self.inputs)
@@ -282,8 +282,8 @@ class LSTMDecoder:
                                                        state_is_tuple=True)
 
         self.W = tf.Variable(
-            tf.truncated_normal([self.num_units*2, self.num_classes], stddev=0.1),name='W')  # Начальная матрица весов, домножается на 2, т.к. сеть двунаправленная
-        self.b = tf.Variable(tf.constant(0., shape=[self.num_classes]),name='b')
+            tf.truncated_normal([self.num_units * 2, self.num_outputs], stddev=0.1),name='W')  # Начальная матрица весов, домножается на 2, т.к. сеть двунаправленная
+        self.b = tf.Variable(tf.constant(0., shape=[self.num_outputs]), name='b')
 
         # 1d array of size [batch_size]
         self.seq_len = tf.placeholder(tf.int32, [None], name='seq_len')
@@ -309,7 +309,7 @@ class LSTMDecoder:
         #                     lambda :self.logits)#Проверяем, задан ли дропаут
         self.logits=tf.nn.dropout(self.logits, self.keep_prob)
         # Reshaping back to the original shape
-        self.logits = tf.reshape(self.logits, [self.batch_size, -1, self.num_classes])
+        self.logits = tf.reshape(self.logits, [self.batch_size, -1, self.num_outputs])
         # Time major
         self.probs=tf.nn.softmax(self.logits,name='probs')#вероятность для [batch_num,t,class_num]
         self.entropy_weights=tf.placeholder(tf.float32, [self.batch_size, None], 'entropy_weights')

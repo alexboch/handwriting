@@ -7,7 +7,7 @@ import utils
 
 utils.enable_kb_interrupt()
 tf.reset_default_graph()
-tb=TrainerBuilder(TrainConfig.BORDERS)
+tb=TrainerBuilder(TrainConfig.FRAGMENTS)
 tr = tb.build_trainer()
 #tr.num_epochs=1
 #tr.num_epochs=1

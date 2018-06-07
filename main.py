@@ -8,9 +8,9 @@ import lstm
 all_chars=[chr(x+1040) for x in range(65)]#Все символы русского алфавита
 all_chars.append(constants.CONNECTION_LABEL)#Метка соединения
 all_chars.append(constants.NOISE_LABEL)#Метка шума
-full_alphabet=prepdata.LabelsAlphabet(all_chars)
+full_alphabet=prepdata.LettersAlphabet(all_chars)
 chars=[constants.CONNECTION_LABEL,constants.NOISE_LABEL]
-connections_only_alphabet=prepdata.LabelsAlphabet(chars)
+connections_only_alphabet=prepdata.LettersAlphabet(chars)
 def train_output_func(decoded):
     values = np.asarray(decoded.values)
     train_decoded = []
@@ -49,6 +49,14 @@ def framewise_mapper(labels_list):
                 new_label=make_label(constants.CONNECTION_LABEL,prev_label[constants.INDEX_KEY])
             result_list.append(new_label)
     return result_list
+
+
+def fragments_mapper(labels_list):
+    """Преобразователь меток при пофрагментной разметке
+    Убирает метки типа "граница", и ставит на их месте метку предыдущей либо последующей точки
+    """
+    
+    pass
 
 def connections_only_mapper(labels_list):
     """
