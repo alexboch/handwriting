@@ -1,3 +1,4 @@
+from enum import Enum
 import tensorflow as tf
 import csv
 import time
@@ -7,6 +8,10 @@ from utils import *
 from graph_helper import GraphHelper
 
 map_fn = tf.map_fn
+
+class Loss(Enum):
+    Sequence=1
+    CrossEntropy=2
 
 class LSTMDecoder:
     """
@@ -24,8 +29,9 @@ class LSTMDecoder:
         learning_rate=kwargs.get('learning_rate',1e-2)
         batch_size=kwargs.get('batch_size',1)
         num_classes=kwargs.pop('num_classes')
+        loss=kwargs.pop('loss')
         self.create_network(num_units, num_layers, num_features,
-                            num_classes, learning_rate, batch_size)
+                            num_classes, learning_rate, batch_size,loss)
 
     @staticmethod
     def from_file(file_path):
@@ -75,14 +81,22 @@ class LSTMDecoder:
         session = tf.Session()
         epoch_errors = []
         if model_load_path is not None:#Если задан путь, то загрузить и дотренировать
+            print("Loading model...")
             load_dir=os.path.dirname(model_load_path)
-            model_name=os.path.splitext(model_load_path)
-            saver=tf.train.import_meta_graph(model_load_path)
+            model_name=os.path.splitext(os.path.basename(model_load_path))[0]
+            print(f"Model name:{model_name}")
+            #new_graph=tf.Graph()
+            #with tf.Session(graph=new_graph) as sess:
+            #    saver=tf.train.import_meta_graph(model_load_path)
+            saver=tf.train.Saver()
             saver.restore(session,tf.train.latest_checkpoint(load_dir))
             csv_path=os.path.join(load_dir,f"{model_name}.csv")
+            print(f"Csv epochs path:{csv_path}")
             epochs_file=csv.DictReader(open(csv_path))
-            epoch_errors=list(epochs_file)#В список словарей
-            last_epoch_num=epoch_errors[-1]["Epoch"]
+            #epoch_errors=list(epochs_file)#В список словарей
+            #for err in epoch_errors:
+            #    print(err)
+            #last_epoch_num=epoch_errors[-1]["Epoch"]#TODO:Исправить загрузку словаря
         else:
             session.run(tf.global_variables_initializer())
         num_batches = len(words) / self.batch_size
@@ -93,25 +107,30 @@ class LSTMDecoder:
 
         start_time=time.time()
         start_datetime=datetime.datetime.now()
+        for word in words:
+            word.length=len(word.point_list)
+            word.weights=[]
         weighted_words=list(words)
-        for word in weighted_words:
-            word.length = len(word.point_list)
-            labels_arr=np.asarray(word.labels_list)
-            num_for_classes=np.zeros(self.num_outputs)
-            for nc in range(self.num_outputs):#Посчитать, сколько объектов каждого класса входит
-                num_for_classes[nc]=np.count_nonzero(labels_arr==nc)#Количество точек данного класса
-            #Задать веса
-            word.weights = np.ones((self.batch_size, len(word.point_list)), dtype=np.float32)
-            class_weights=np.ones(self.num_outputs)
-            n0=num_for_classes[np.where(num_for_classes>0)][0]
-            i=0
-            for ni in num_for_classes:
-                x=n0/ni
-                class_weights[i]=x
-                i+=1
-            for j in range(self.num_outputs):
-                class_mask=(labels_arr==j)
-                word.weights[0][class_mask]=class_weights[j]
+
+
+        if self.loss==Loss.Sequence:
+            for word in weighted_words:
+                labels_arr=np.asarray(word.labels_list)
+                num_for_classes=np.zeros(self.num_outputs)
+                for nc in range(self.num_outputs):#Посчитать, сколько объектов каждого класса входит
+                    num_for_classes[nc]=np.count_nonzero(labels_arr==nc)#Количество точек данного класса
+                #Задать веса
+                word.weights = np.ones((self.batch_size, len(word.point_list)), dtype=np.float32)
+                class_weights=np.ones(self.num_outputs)
+                n0=num_for_classes[np.where(num_for_classes>0)][0]
+                i=0
+                for ni in num_for_classes:
+                    x=n0/ni
+                    class_weights[i]=x
+                    i+=1
+                for j in range(self.num_outputs):
+                    class_mask=(labels_arr==j)
+                    word.weights[0][class_mask]=class_weights[j]
 
         data_len=len(weighted_words)
         train_len=data_len#Если нет валидации, берем весь массив слов
@@ -142,10 +161,14 @@ class LSTMDecoder:
                     targets_array = np.asarray(batch_labels)
                     #TODO: переделать под переменную длину либо убрать лишнее и оставить размер батча 1
                     #Подаем батч на вход и получаем результат
-                    loss,probs,_ = session.run([self.loss,self.probs,self.train_fn],
-                                                                           feed_dict={self.inputs: inputs_arr, self.targets: targets_array,self.entropy_weights:batch_word.weights,
+                    feed_dict={self.inputs: inputs_arr, self.targets: targets_array,
                                                                                       self.seq_len: seq_lengths,self.keep_prob:keep_prob,
-                                                                                      })
+                                                                                      }
+                    if self.loss==Loss.Sequence:
+                        feed_dict[self.entropy_weights]=batch_word.weights
+
+                    loss,probs,_ = session.run([self.loss,self.probs,self.train_fn],
+                                                                           feed_dict=feed_dict)
                     train_epoch_loss+=loss
                     if can_output:
                         print(f"Word loss:{loss}", "Epoch:", epoch_num,"Word number:",j,f"Word:{batch_word.text}")
@@ -160,13 +183,13 @@ class LSTMDecoder:
                     for val_word in validation_data:#Для каждого слова валидации
                         val_inputs_arr = np.asarray([val_word.point_list])
                         val_targets_arr=np.asarray([val_word.labels_list])
-
-                        validation_loss=session.run(self.loss,
-                                                                                  feed_dict={self.inputs:val_inputs_arr,
+                        val_feeds={self.inputs:val_inputs_arr,
                                                                                              self.targets:val_targets_arr,
                                                                                              self.seq_len:[val_word.length],
-                                                                                             self.entropy_weights:val_word.weights,
-                                                                                             self.keep_prob:1.0})
+                                                                                             self.keep_prob:1.0}
+                        if self.loss==Loss.Sequence:
+                            val_feeds[self.entropy_weights]=val_word.weights,
+                        validation_loss=session.run(self.loss, feed_dict=val_feeds)
                         validation_loss_sum+=validation_loss
                     val_feeds_len=len(validation_data)
                     validation_epoch_norm/=val_feeds_len
@@ -197,7 +220,10 @@ class LSTMDecoder:
                     epoch_errors.append(epoch_errors_data)
         except KeyboardInterrupt:#Ctrl-c
             print("Keyboard interrupt")
+        except Exception as exc:
+            print(f"Exception:{exc}")
         finally:
+
             end_datetime=datetime.datetime.now()
             print(f"Output directory:{model_dir_path}")
             print("Saving training config...")
@@ -267,7 +293,7 @@ class LSTMDecoder:
         return tf.contrib.rnn.stack_bidirectional_dynamic_rnn(cells_fw=cells_fw,cells_bw=cells_bw,inputs=inputs, dtype=tf.float32)
 
 
-    def create_network(self, num_units, num_layers, num_features, num_outputs, learning_rate, batch_size=10):
+    def create_network(self, num_units, num_layers, num_features, num_outputs, learning_rate, batch_size=10,loss_kind=Loss.Sequence):
         self.num_units = num_units
         self.num_layers = num_layers
         self.learning_rate = learning_rate
@@ -277,13 +303,18 @@ class LSTMDecoder:
         self.num_features=num_features
         self.batch_size = batch_size
         shape = tf.shape(self.inputs)
-        self.targets=tf.placeholder(tf.int32,shape=[self.batch_size,None],name='targets')
+        if loss_kind==Loss.Sequence:
+            self.targets=tf.placeholder(tf.int32,shape=[self.batch_size,None],name='targets')
+        else:
+            self.targets=tf.placeholder(tf.float32,shape=[self.batch_size,None,self.num_outputs])
         self.cells_stack = tf.contrib.rnn.MultiRNNCell([self.lstm_cell() for _ in range(self.num_layers)],
                                                        state_is_tuple=True)
 
         self.W = tf.Variable(
             tf.truncated_normal([self.num_units * 2, self.num_outputs], stddev=0.1),name='W')  # Начальная матрица весов, домножается на 2, т.к. сеть двунаправленная
+        #tf.summary.histogram("weights",self.W)
         self.b = tf.Variable(tf.constant(0., shape=[self.num_outputs]), name='b')
+        #tf.summary.histogram("biases",self.b)
 
         # 1d array of size [batch_size]
         self.seq_len = tf.placeholder(tf.int32, [None], name='seq_len')
@@ -313,7 +344,11 @@ class LSTMDecoder:
         # Time major
         self.probs=tf.nn.softmax(self.logits,name='probs')#вероятность для [batch_num,t,class_num]
         self.entropy_weights=tf.placeholder(tf.float32, [self.batch_size, None], 'entropy_weights')
-        self.loss=tf.contrib.seq2seq.sequence_loss(self.logits, self.targets, self.entropy_weights)
+        if loss_kind==Loss.Sequence:
+            self.loss=tf.contrib.seq2seq.sequence_loss(self.logits, self.targets, self.entropy_weights)
+        else:
+            self.loss=tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(labels=self.targets,logits=self.logits))
+
         self.train_fn = tf.train.MomentumOptimizer(self.learning_rate,
                                                    0.99).minimize(self.loss)
         self.ler=-1
