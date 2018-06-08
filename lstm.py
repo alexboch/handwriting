@@ -74,7 +74,7 @@ class LSTMDecoder:
 
 
     def train(self, words, num_epochs=100, output_training=False, model_name="model",
-              model_dir_path=f"Models{os.sep}model",validate=True,keep_prob=0.5,model_load_path=None):
+              model_dir_path=f"Models{os.sep}model",validate=True,keep_prob=0.5,model_load_path=None,batch_size=5):
         """
         :param words: Список слов, содержащих точки и метки
         """
@@ -120,6 +120,7 @@ class LSTMDecoder:
         weighted_words=list(words)
 
 
+
         if self.loss==Loss.Sequence:
             for word in weighted_words:
                 labels_arr=np.asarray(word.labels_list)
@@ -141,6 +142,7 @@ class LSTMDecoder:
 
         data_len=len(weighted_words)
         train_len=data_len#Если нет валидации, берем весь массив слов
+        #tf.data.Dataset.from_tensors()
         valid_len=0
         validate=validate and data_len>1#Если слово только 1, то валидацию следать не сможем
         if data_len<=1:
@@ -158,12 +160,13 @@ class LSTMDecoder:
                 np.random.shuffle(words)#
                 train_epoch_loss = 0  # Средняя ошибка по всем батчам в данной эпохе
                 can_output=output_training and (i%output_period==0 or i==num_epochs-1)
-                for j in np.arange(0, len(training_words)):  # Цикл по всем тренировочным словам, берем по 1 слову
-                    batch_word = training_words[j]  # слова для создания батча
-                    batch_inputs = [batch_word.point_list]
-                    batch_labels = [batch_word.labels_list]
-                    seq_lengths = [batch_word.length]  # Вектор длин каждой последовательности
-                    total_points_num+=batch_word.length
+                for j in np.arange(0, len(training_words),batch_size):  # Цикл по всем тренировочным словам, берем по 1 слову
+                    max_index=j+batch_size if j+batch_size<len(training_words) else len(training_words)
+                    batch_words = training_words[j:max_index]  # слова для создания батча
+                    batch_inputs = [batch_word.point_list for batch_word in batch_words]
+                    batch_labels = [batch_word.labels_list for batch_word in batch_words]
+                    seq_lengths = [batch_word.length for batch_word in batch_words]  # Вектор длин каждой последовательности
+                    total_points_num+=sum(batch_word.length for batch_word in batch_words)
                     inputs_arr = np.asarray(batch_inputs)
                     targets_array = np.asarray(batch_labels)
                     #TODO: переделать под переменную длину либо убрать лишнее и оставить размер батча 1
@@ -173,7 +176,7 @@ class LSTMDecoder:
                                                                                       self.seq_len: seq_lengths,self.keep_prob:keep_prob,
                                                                                       }
                     if self.loss==Loss.Sequence:
-                        feed_dict[self.entropy_weights]=batch_word.weights
+                        feed_dict[self.entropy_weights]=[batch_word.weights for batch_word in batch_words]
 
                     step,summary,loss,probs,_ = session.run([self.global_step,merged,self.loss,self.probs,self.train_fn],
                                                                            feed_dict=feed_dict)
@@ -311,17 +314,18 @@ class LSTMDecoder:
         self.num_units = num_units
         self.num_layers = num_layers
         self.learning_rate = learning_rate
-        self.inputs = tf.placeholder(tf.float32, [None, None, num_features], name='inputs')
+        self.inputs = tf.placeholder(tf.float32, [None, None, num_features], name='inputs')#[batch_size,max_time,num_features]
         self.keep_prob=tf.placeholder(tf.float32)#Вероятность, что выходной нейрон остается
         self.num_outputs = num_outputs
         self.num_features=num_features
         self.batch_size = batch_size
+        #self.batch_size=tf.placeholder(batch_size,trainable=False,name='batch_size')
         self.global_step=tf.Variable(0,trainable=False,name='global_step')
         #shape = tf.shape(self.inputs)
         if loss_kind==Loss.Sequence:
-            self.targets=tf.placeholder(tf.int32,shape=[self.batch_size,None],name='targets')
+            self.targets=tf.placeholder(tf.int32,shape=[None,None],name='targets')
         else:
-            self.targets=tf.placeholder(tf.float32,shape=[self.batch_size,None,self.num_outputs])
+            self.targets=tf.placeholder(tf.float32,shape=[None,None,self.num_outputs])
         self.cells_stack = tf.contrib.rnn.MultiRNNCell([self.lstm_cell() for _ in range(self.num_layers)],
                                                        state_is_tuple=True)
 
@@ -356,11 +360,11 @@ class LSTMDecoder:
         #                     lambda :self.logits)#Проверяем, задан ли дропаут
         self.logits=tf.nn.dropout(self.logits, self.keep_prob)
         # Reshaping back to the original shape
-        self.logits = tf.reshape(self.logits, [self.batch_size, -1, self.num_outputs])
+        #self.logits = tf.reshape(self.logits, [None, -1, self.num_outputs])
         # Time major
         self.probs=tf.nn.softmax(self.logits,name='probs')#вероятность для [batch_num,t,class_num]
         self.probs_hist=tf.summary.histogram('probs',self.probs)
-        self.entropy_weights=tf.placeholder(tf.float32, [self.batch_size, None], 'entropy_weights')
+        self.entropy_weights=tf.placeholder(tf.float32, [None, None], 'entropy_weights')#[batch_size, sequence_length]
         with tf.name_scope("loss"):
             if loss_kind==Loss.Sequence:
                 self.loss=tf.contrib.seq2seq.sequence_loss(self.logits, self.targets, self.entropy_weights)
