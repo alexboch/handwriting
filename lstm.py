@@ -55,19 +55,23 @@ class LSTMDecoder:
         """
         model_name = os.path.join(model_dir, model_name + ".meta")
         with tf.Session() as session:
-            saver = tf.train.import_meta_graph(model_name)
-            saver.restore(session, tf.train.latest_checkpoint(model_dir))  # Загрузить натренированную модель
+            with tf.name_scope("restore_inference"):
+                saver = tf.train.import_meta_graph(model_name)
+                saver.restore(session, tf.train.latest_checkpoint(model_dir))  # Загрузить натренированную модель
             probs_list = []
             for points_list in points:
                 input_arr = np.asarray(points_list)
                 input_arr = np.expand_dims(input_arr, 0)
-                probs = session.run([self.probs],
-                                                       feed_dict={self.inputs: input_arr,
-                                                                  self.seq_len: [len(points_list)]})
+                with tf.name_scope("get_probs"):
+                    probs = session.run([self.probs],
+                                                           feed_dict={self.inputs: input_arr,
+                                                                      self.seq_len: [len(points_list)]})
                 probs_list.append(probs[0])
         return probs_list
 
     TINY = 1e-6  # to avoid NaNs in logs
+
+
 
     def train(self, words, num_epochs=100, output_training=False, model_name="model",
               model_dir_path=f"Models{os.sep}model",validate=True,keep_prob=0.5,model_load_path=None):
@@ -75,11 +79,13 @@ class LSTMDecoder:
         :param words: Список слов, содержащих точки и метки
         """
         os.environ['FOR_DISABLE_CONSOLE_CTRL_HANDLER'] = '1'
-        #words=words[0:2]#TODO:убрать
+        LOG_DIR = "Summary"
+        writer = tf.summary.FileWriter(os.path.join(model_dir_path, LOG_DIR))
         print("starting training,epochs:",num_epochs,"learning rate:",self.learning_rate)
         last_epoch_num=0
         session = tf.Session()
         epoch_errors = []
+        merged=tf.summary.merge_all()
         if model_load_path is not None:#Если задан путь, то загрузить и дотренировать
             print("Loading model...")
             load_dir=os.path.dirname(model_load_path)
@@ -88,8 +94,9 @@ class LSTMDecoder:
             #new_graph=tf.Graph()
             #with tf.Session(graph=new_graph) as sess:
             #    saver=tf.train.import_meta_graph(model_load_path)
-            saver=tf.train.Saver()
-            saver.restore(session,tf.train.latest_checkpoint(load_dir))
+            with tf.name_scope("restore_train"):
+                saver=tf.train.Saver()
+                saver.restore(session,tf.train.latest_checkpoint(load_dir))
             csv_path=os.path.join(load_dir,f"{model_name}.csv")
             print(f"Csv epochs path:{csv_path}")
             epochs_file=csv.DictReader(open(csv_path))
@@ -160,6 +167,7 @@ class LSTMDecoder:
                     inputs_arr = np.asarray(batch_inputs)
                     targets_array = np.asarray(batch_labels)
                     #TODO: переделать под переменную длину либо убрать лишнее и оставить размер батча 1
+
                     #Подаем батч на вход и получаем результат
                     feed_dict={self.inputs: inputs_arr, self.targets: targets_array,
                                                                                       self.seq_len: seq_lengths,self.keep_prob:keep_prob,
@@ -167,12 +175,12 @@ class LSTMDecoder:
                     if self.loss==Loss.Sequence:
                         feed_dict[self.entropy_weights]=batch_word.weights
 
-                    loss,probs,_ = session.run([self.loss,self.probs,self.train_fn],
+                    step,summary,loss,probs,_ = session.run([self.global_step,merged,self.loss,self.probs,self.train_fn],
                                                                            feed_dict=feed_dict)
                     train_epoch_loss+=loss
                     if can_output:
                         print(f"Word loss:{loss}", "Epoch:", epoch_num,"Word number:",j,f"Word:{batch_word.text}")
-
+                        writer.add_summary(summary,step)
                 """Конец эпохи(Прошли весь тренировочный датасет)"""
                 #Валидация
                 if validate:
@@ -207,6 +215,7 @@ class LSTMDecoder:
                             print("Epoch number:", epoch_num)
                             print("Epoch loss:",epoch_validation_loss)
                             print("Epoch normalized distance:",validation_epoch_nn)
+                            
                 train_epoch_loss /= len(training_words)
                 elapsed_time=time.time()-start_time
                 if i%output_period==0 or i==num_epochs-1:
@@ -267,6 +276,11 @@ class LSTMDecoder:
             print("Freezing graph...")
             GraphHelper.freeze_graph(model_dir_path,'probs')
             print("Graph freezing finished")
+
+
+            writer.add_graph(session.graph)
+            writer.flush()
+            writer.close()
             print("Training result saved")
             session.close()
         return epoch_errors
@@ -302,7 +316,8 @@ class LSTMDecoder:
         self.num_outputs = num_outputs
         self.num_features=num_features
         self.batch_size = batch_size
-        shape = tf.shape(self.inputs)
+        self.global_step=tf.Variable(0,trainable=False,name='global_step')
+        #shape = tf.shape(self.inputs)
         if loss_kind==Loss.Sequence:
             self.targets=tf.placeholder(tf.int32,shape=[self.batch_size,None],name='targets')
         else:
@@ -312,9 +327,9 @@ class LSTMDecoder:
 
         self.W = tf.Variable(
             tf.truncated_normal([self.num_units * 2, self.num_outputs], stddev=0.1),name='W')  # Начальная матрица весов, домножается на 2, т.к. сеть двунаправленная
-        #tf.summary.histogram("weights",self.W)
+        self.weights_hist=tf.summary.histogram("weights",self.W)
         self.b = tf.Variable(tf.constant(0., shape=[self.num_outputs]), name='b')
-        #tf.summary.histogram("biases",self.b)
+        self.bias_hist=tf.summary.histogram("biases",self.b)
 
         # 1d array of size [batch_size]
         self.seq_len = tf.placeholder(tf.int32, [None], name='seq_len')
@@ -322,17 +337,18 @@ class LSTMDecoder:
         # rnn_state--последнее состояние
         cells_fw = []
         cells_bw = []
-        for n in range(num_layers):
-            cell_fw = self.lstm_cell()
-            cell_bw = self.lstm_cell()
-            cells_fw.append(cell_fw)
-            cells_bw.append(cell_bw)
-        self.rnn_outputs, self.rnn_state_fw,self.rnn_state_bw=tf.contrib.rnn.stack_bidirectional_dynamic_rnn(cells_fw=cells_fw, cells_bw=cells_bw, inputs=self.inputs,
-                                                                                                             sequence_length=self.seq_len,
-                                                              dtype=tf.float32)
-        # Reshaping to apply the same weights over the timesteps
-        self.rnn_outputs=self.rnn_outputs[-1]#Берем вывод последнего слоя
-        self.rnn_outputs = tf.reshape(self.rnn_outputs, [-1, self.num_units*2])
+        with tf.name_scope("nn_struct"):
+            for n in range(num_layers):
+                cell_fw = self.lstm_cell()
+                cell_bw = self.lstm_cell()
+                cells_fw.append(cell_fw)
+                cells_bw.append(cell_bw)
+            self.rnn_outputs, self.rnn_state_fw,self.rnn_state_bw=tf.contrib.rnn.stack_bidirectional_dynamic_rnn(cells_fw=cells_fw, cells_bw=cells_bw, inputs=self.inputs,
+                                                                                                                 sequence_length=self.seq_len,
+                                                                  dtype=tf.float32)
+            # Reshaping to apply the same weights over the timesteps
+            self.rnn_outputs=self.rnn_outputs[-1]#Берем вывод последнего слоя
+            self.rnn_outputs = tf.reshape(self.rnn_outputs, [-1, self.num_units*2])
 
         self.logits = tf.matmul(self.rnn_outputs, self.W) + self.b
 
@@ -343,13 +359,18 @@ class LSTMDecoder:
         self.logits = tf.reshape(self.logits, [self.batch_size, -1, self.num_outputs])
         # Time major
         self.probs=tf.nn.softmax(self.logits,name='probs')#вероятность для [batch_num,t,class_num]
+        self.probs_hist=tf.summary.histogram('probs',self.probs)
         self.entropy_weights=tf.placeholder(tf.float32, [self.batch_size, None], 'entropy_weights')
-        if loss_kind==Loss.Sequence:
-            self.loss=tf.contrib.seq2seq.sequence_loss(self.logits, self.targets, self.entropy_weights)
-        else:
-            self.loss=tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(labels=self.targets,logits=self.logits))
-
-        self.train_fn = tf.train.MomentumOptimizer(self.learning_rate,
-                                                   0.99).minimize(self.loss)
+        with tf.name_scope("loss"):
+            if loss_kind==Loss.Sequence:
+                self.loss=tf.contrib.seq2seq.sequence_loss(self.logits, self.targets, self.entropy_weights)
+            else:
+                self.xent=tf.nn.sigmoid_cross_entropy_with_logits(labels=self.targets, logits=self.logits)
+                self.loss=tf.reduce_mean(self.xent)
+            tf.summary.histogram('xent',self.xent)
+            tf.summary.scalar('loss',self.loss)
+        with tf.name_scope("train"):
+            self.train_fn = tf.train.MomentumOptimizer(self.learning_rate,
+                                                   0.99).minimize(self.loss,global_step=self.global_step)
         self.ler=-1
         pass
