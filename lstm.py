@@ -74,7 +74,7 @@ class LSTMDecoder:
 
 
     def train(self, words, num_epochs=100, output_training=False, model_name="model",
-              model_dir_path=f"Models{os.sep}model",validate=True,keep_prob=0.5,model_load_path=None,batch_size=5):
+              model_dir_path=f"Models{os.sep}model",validate=True,keep_prob=0.5,model_load_path=None,batch_size=3):
         """
         :param words: Список слов, содержащих точки и метки
         """
@@ -160,20 +160,23 @@ class LSTMDecoder:
                 np.random.shuffle(words)#
                 train_epoch_loss = 0  # Средняя ошибка по всем батчам в данной эпохе
                 can_output=output_training and (i%output_period==0 or i==num_epochs-1)
+                multiples=[batch_size,1,1]
                 for j in np.arange(0, len(training_words),batch_size):  # Цикл по всем тренировочным словам, берем по 1 слову
                     max_index=j+batch_size if j+batch_size<len(training_words) else len(training_words)
+
                     batch_words = training_words[j:max_index]  # слова для создания батча
+                    max_len=max([w.length for w in batch_words])
                     batch_inputs = [batch_word.point_list for batch_word in batch_words]
                     batch_labels = [batch_word.labels_list for batch_word in batch_words]
                     seq_lengths = [batch_word.length for batch_word in batch_words]  # Вектор длин каждой последовательности
                     total_points_num+=sum(batch_word.length for batch_word in batch_words)
-                    inputs_arr = np.asarray(batch_inputs)
-                    targets_array = np.asarray(batch_labels)
+                    inputs_arr = np.asarray([np.asarray(batch_input) for batch_input in batch_inputs])
+                    targets_array = np.asarray(batch_labels)#TODO:Сделать копирование части массива в массив правильной размерности
                     #TODO: переделать под переменную длину либо убрать лишнее и оставить размер батча 1
 
                     #Подаем батч на вход и получаем результат
                     feed_dict={self.inputs: inputs_arr, self.targets: targets_array,
-                                                                                      self.seq_len: seq_lengths,self.keep_prob:keep_prob,
+                               self.seq_len: seq_lengths,self.keep_prob:keep_prob,self.multiples:multiples
                                                                                       }
                     if self.loss==Loss.Sequence:
                         feed_dict[self.entropy_weights]=[batch_word.weights for batch_word in batch_words]
@@ -182,7 +185,8 @@ class LSTMDecoder:
                                                                            feed_dict=feed_dict)
                     train_epoch_loss+=loss
                     if can_output:
-                        print(f"Word loss:{loss}", "Epoch:", epoch_num,"Word number:",j,f"Word:{batch_word.text}")
+                        for batch_word in batch_words:
+                            print(f"Word loss:{loss}", "Epoch:", epoch_num,"Word number:",j,f"Word:{batch_word.text}")
                         writer.add_summary(summary,step)
                 """Конец эпохи(Прошли весь тренировочный датасет)"""
                 #Валидация
@@ -195,9 +199,9 @@ class LSTMDecoder:
                         val_inputs_arr = np.asarray([val_word.point_list])
                         val_targets_arr=np.asarray([val_word.labels_list])
                         val_feeds={self.inputs:val_inputs_arr,
-                                                                                             self.targets:val_targets_arr,
-                                                                                             self.seq_len:[val_word.length],
-                                                                                             self.keep_prob:1.0}
+                         self.targets:val_targets_arr,
+                         self.seq_len:[val_word.length],
+                         self.keep_prob:1.0,self.multiples:multiples}
                         if self.loss==Loss.Sequence:
                             val_feeds[self.entropy_weights]=val_word.weights,
                         validation_loss=session.run(self.loss, feed_dict=val_feeds)
@@ -331,10 +335,13 @@ class LSTMDecoder:
 
         self.W = tf.Variable(
             tf.truncated_normal([self.num_units * 2, self.num_outputs], stddev=0.1),name='W')  # Начальная матрица весов, домножается на 2, т.к. сеть двунаправленная
+        #Нужно добавить одно измерение скопировать веса, чтобы умножать элементы из каждого батча на матрицу весов
+        self.W=tf.expand_dims(self.W,axis=0)#Добавить измерение
+        self.multiples=tf.placeholder(dtype=tf.int32)#Список для копирования весов, его элемент--это количественный множитель
+        self.W=tf.tile(self.W,self.multiples)#Теперь должны быть копии весов для каждого батча
         self.weights_hist=tf.summary.histogram("weights",self.W)
         self.b = tf.Variable(tf.constant(0., shape=[self.num_outputs]), name='b')
         self.bias_hist=tf.summary.histogram("biases",self.b)
-
         # 1d array of size [batch_size]
         self.seq_len = tf.placeholder(tf.int32, [None], name='seq_len')
         # rnn_outputs--Тензор размерности [batch_size,max_time,cell.output_size],max_time--кол-во точек слова,cell.output_size=2(x,y координаты)
@@ -350,9 +357,13 @@ class LSTMDecoder:
             self.rnn_outputs, self.rnn_state_fw,self.rnn_state_bw=tf.contrib.rnn.stack_bidirectional_dynamic_rnn(cells_fw=cells_fw, cells_bw=cells_bw, inputs=self.inputs,
                                                                                                                  sequence_length=self.seq_len,
                                                                   dtype=tf.float32)
+            #rnn_outputs[batch_size,max_time,layers_output]
+            # layers_output are depth-concatenated forward and backward outputs
+            #Значит, layers output будет равно num_units*2
             # Reshaping to apply the same weights over the timesteps
-            self.rnn_outputs=self.rnn_outputs[-1]#Берем вывод последнего слоя
-            self.rnn_outputs = tf.reshape(self.rnn_outputs, [-1, self.num_units*2])
+            #self.rnn_outputs=self.rnn_outputs[-1]#Берем вывод последнего слоя
+            #rnn_outputs:[batch_size, max_time, layers_output]
+            #self.rnn_outputs = tf.reshape(self.rnn_outputs, [-1, self.num_units*2])
 
         self.logits = tf.matmul(self.rnn_outputs, self.W) + self.b
 
@@ -362,6 +373,7 @@ class LSTMDecoder:
         # Reshaping back to the original shape
         #self.logits = tf.reshape(self.logits, [None, -1, self.num_outputs])
         # Time major
+
         self.probs=tf.nn.softmax(self.logits,name='probs')#вероятность для [batch_num,t,class_num]
         self.probs_hist=tf.summary.histogram('probs',self.probs)
         self.entropy_weights=tf.placeholder(tf.float32, [None, None], 'entropy_weights')#[batch_size, sequence_length]
