@@ -160,27 +160,39 @@ class LSTMDecoder:
                 np.random.shuffle(words)#
                 train_epoch_loss = 0  # Средняя ошибка по всем батчам в данной эпохе
                 can_output=output_training and (i%output_period==0 or i==num_epochs-1)
-                multiples=[batch_size,1,1]
-                for j in np.arange(0, len(training_words),batch_size):  # Цикл по всем тренировочным словам, берем по 1 слову
-                    max_index=j+batch_size if j+batch_size<len(training_words) else len(training_words)
 
+                for j in np.arange(0, len(training_words),batch_size):  # Цикл по всем тренировочным словам, берем по 1 слову
+
+                    max_index=j+batch_size if j+batch_size<len(training_words) else len(training_words)
+                    multiples = [batch_size, 1, 1]
                     batch_words = training_words[j:max_index]  # слова для создания батча
                     max_len=max([w.length for w in batch_words])
                     batch_inputs = [batch_word.point_list for batch_word in batch_words]
                     batch_labels = [batch_word.labels_list for batch_word in batch_words]
                     seq_lengths = [batch_word.length for batch_word in batch_words]  # Вектор длин каждой последовательности
                     total_points_num+=sum(batch_word.length for batch_word in batch_words)
-                    inputs_arr = np.asarray([np.asarray(batch_input) for batch_input in batch_inputs])
-                    targets_array = np.asarray(batch_labels)#TODO:Сделать копирование части массива в массив правильной размерности
+                    inputs_arr=np.zeros((batch_size, max_len, self.num_features))
+                    #if self.loss_kind==Loss.Sequence:
+                    #targets_array=np.zeros()
+                    #inputs_arr = np.asarray([np.asarray(batch_input) for batch_input in batch_inputs])
+                    if self.loss_kind==Loss.Sequence:
+                        targets_array=np.zeros((batch_size,max_len))
+                    else:
+                        targets_array=np.zeros((batch_size,max_len,self.num_outputs))
+                    for batch_num in range(batch_size):
+                        w=batch_words[batch_num]
+                        batch = batch_inputs[batch_num]
+                        l = seq_lengths[batch_num]
+                        inputs_arr[batch_num][:l] = batch
+                        targets_array[batch_num][:l]=w.labels_list
+                    #targets_array = np.asarray(batch_labels)#TODO:Сделать копирование части массива в массив правильной размерности
                     #TODO: переделать под переменную длину либо убрать лишнее и оставить размер батча 1
-
                     #Подаем батч на вход и получаем результат
                     feed_dict={self.inputs: inputs_arr, self.targets: targets_array,
                                self.seq_len: seq_lengths,self.keep_prob:keep_prob,self.multiples:multiples
                                                                                       }
                     if self.loss==Loss.Sequence:
                         feed_dict[self.entropy_weights]=[batch_word.weights for batch_word in batch_words]
-
                     step,summary,loss,probs,_ = session.run([self.global_step,merged,self.loss,self.probs,self.train_fn],
                                                                            feed_dict=feed_dict)
                     train_epoch_loss+=loss
@@ -323,13 +335,14 @@ class LSTMDecoder:
         self.num_outputs = num_outputs
         self.num_features=num_features
         self.batch_size = batch_size
+        self.loss_kind=loss_kind
         #self.batch_size=tf.placeholder(batch_size,trainable=False,name='batch_size')
         self.global_step=tf.Variable(0,trainable=False,name='global_step')
         #shape = tf.shape(self.inputs)
         if loss_kind==Loss.Sequence:
-            self.targets=tf.placeholder(tf.int32,shape=[None,None],name='targets')
+            self.targets=tf.placeholder(tf.int32,shape=[None,None],name='targets')#[num_batches,max_time]
         else:
-            self.targets=tf.placeholder(tf.float32,shape=[None,None,self.num_outputs])
+            self.targets=tf.placeholder(tf.float32,shape=[None,None,self.num_outputs])#[num_batches,max_time,num_outputs]
         self.cells_stack = tf.contrib.rnn.MultiRNNCell([self.lstm_cell() for _ in range(self.num_layers)],
                                                        state_is_tuple=True)
 
