@@ -213,16 +213,18 @@ class LSTMDecoder:
                     validation_epoch_nn=0
                     validation_epoch_cost=0
                     validation_loss_sum=0
+                    val_multiples=[1,1,1]
                     for val_word in validation_data:#Для каждого слова валидации
                         val_inputs_arr = np.asarray([val_word.point_list])
                         val_targets_arr=np.asarray([val_word.labels_list])
                         val_feeds={self.inputs:val_inputs_arr,
                          self.targets:val_targets_arr,
                          self.seq_len:[val_word.length],
-                         self.keep_prob:1.0,self.multiples:multiples}
+                         self.keep_prob:1.0,self.multiples:val_multiples}
                         if self.loss==Loss.Sequence:
                             val_feeds[self.entropy_weights]=val_word.weights,
                         validation_loss=session.run(self.loss, feed_dict=val_feeds)
+                        print(f"loss{validation_loss} word:{val_word.text}")
                         validation_loss_sum+=validation_loss
                     val_feeds_len=len(validation_data)
                     validation_epoch_norm/=val_feeds_len
@@ -241,7 +243,7 @@ class LSTMDecoder:
                             print("Epoch loss:",epoch_validation_loss)
                             print("Epoch normalized distance:",validation_epoch_nn)
                             
-                train_epoch_loss /= len(training_words)
+                train_epoch_loss /= num_batches
                 elapsed_time=time.time()-start_time
                 if i%output_period==0 or i==num_epochs-1:
                     if output_training:
