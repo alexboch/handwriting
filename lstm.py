@@ -74,7 +74,7 @@ class LSTMDecoder:
 
 
     def train(self, words, num_epochs=100, output_training=False, model_name="model",
-              model_dir_path=f"Models{os.sep}model",validate=True,keep_prob=0.5,model_load_path=None,batch_size=3):
+              model_dir_path=f"Models{os.sep}model",validate=True,keep_prob=0.5,model_load_path=None,batch_size=20):
         """
         :param words: Список слов, содержащих точки и метки
         """
@@ -157,36 +157,42 @@ class LSTMDecoder:
             for i in np.arange(num_epochs):
                 epoch_num=last_epoch_num+i
                 epoch_errors_data=dict()
-                np.random.shuffle(words)#
+                #np.random.shuffle(words)#
+                np.random.shuffle(training_words)
                 train_epoch_loss = 0  # Средняя ошибка по всем батчам в данной эпохе
                 can_output=output_training and (i%output_period==0 or i==num_epochs-1)
+                #training_words = [training_words[0]]  # TODO Убрать
+                lt = len(training_words)
+                print(f"Words count:{lt}")
 
-                for j in np.arange(0, len(training_words),batch_size):  # Цикл по всем тренировочным словам, берем по 1 слову
-
-                    max_index=j+batch_size if j+batch_size<len(training_words) else len(training_words)
-                    multiples = [batch_size, 1, 1]
+                for j in np.arange(0, lt,batch_size):  # Цикл по всем тренировочным словам, берем по 1 слову
+                    real_batch_size=batch_size if j+batch_size<lt else lt-j
+                    print(f"j:{j}")
+                    #max_index=j+batch_size if j+batch_size<len(training_words) else len(training_words)
+                    max_index=j+real_batch_size
+                    print(f"max_index:{max_index}")
+                    multiples = [real_batch_size, 1, 1]
                     batch_words = training_words[j:max_index]  # слова для создания батча
-                    max_len=max([w.length for w in batch_words])
+                    np.random.shuffle(batch_words)
+                    max_len = max([w.length for w in batch_words])
                     batch_inputs = [batch_word.point_list for batch_word in batch_words]
                     batch_labels = [batch_word.labels_list for batch_word in batch_words]
                     seq_lengths = [batch_word.length for batch_word in batch_words]  # Вектор длин каждой последовательности
                     total_points_num+=sum(batch_word.length for batch_word in batch_words)
-                    inputs_arr=np.zeros((batch_size, max_len, self.num_features))
+                    inputs_arr=np.zeros((real_batch_size, max_len, self.num_features))
                     #if self.loss_kind==Loss.Sequence:
                     #targets_array=np.zeros()
                     #inputs_arr = np.asarray([np.asarray(batch_input) for batch_input in batch_inputs])
                     if self.loss_kind==Loss.Sequence:
-                        targets_array=np.zeros((batch_size,max_len))
+                        targets_array=np.zeros((real_batch_size,max_len))
                     else:
-                        targets_array=np.zeros((batch_size,max_len,self.num_outputs))
-                    for batch_num in range(batch_size):
+                        targets_array=np.zeros((real_batch_size,max_len,self.num_outputs))
+                    for batch_num in range(real_batch_size):
                         w=batch_words[batch_num]
                         batch = batch_inputs[batch_num]
                         l = seq_lengths[batch_num]
                         inputs_arr[batch_num][:l] = batch
                         targets_array[batch_num][:l]=w.labels_list
-                    #targets_array = np.asarray(batch_labels)#TODO:Сделать копирование части массива в массив правильной размерности
-                    #TODO: переделать под переменную длину либо убрать лишнее и оставить размер батча 1
                     #Подаем батч на вход и получаем результат
                     feed_dict={self.inputs: inputs_arr, self.targets: targets_array,
                                self.seq_len: seq_lengths,self.keep_prob:keep_prob,self.multiples:multiples
@@ -249,9 +255,8 @@ class LSTMDecoder:
         except KeyboardInterrupt:#Ctrl-c
             print("Keyboard interrupt")
         except Exception as exc:
-            print(f"Exception:{exc}")
+            PrintException()
         finally:
-
             end_datetime=datetime.datetime.now()
             print(f"Output directory:{model_dir_path}")
             print("Saving training config...")
