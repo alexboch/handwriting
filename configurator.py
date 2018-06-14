@@ -1,11 +1,12 @@
 from enum import Enum
-import prepare_data as prepdata
-import numpy as np
-import constants
+
 import tensorflow as tf
-from feature_vectors_set import *
-import labels_converter as lc
+
 import data_filters as dc
+import labels_converter as lc
+import prepare_data as prepdata
+from feature_vectors_set import *
+from mappers import *
 
 """
 В этом модуле задается соответствие между параметрами и конфигурациями
@@ -77,8 +78,6 @@ def get_featurizer(train_config):
     else:
         return FeatureVectorsSetFull()
 
-def make_label(symbol,index):
-    return {constants.CHAR_KEY:symbol,constants.INDEX_KEY:index}
 
 def get_data_directory(train_config):
     return "Data"
@@ -89,42 +88,6 @@ def lstm_cell_factory(num_units):
 def get_cell_factory(train_config):
     """Функция, создающая клетку нейронки"""
 
-
-def connections_only_mapper(labels_list):
-    """
-    :param labels_list:
-    :return:
-    """
-    result_list=[]
-    for label in labels_list:
-        new_label=label
-        if label is not None:
-            new_char_label=label['Item1'] if label['Item1']==constants.CONNECTION_LABEL else constants.NOISE_LABEL
-            new_label['Item1']=new_char_label
-        result_list.append(new_label)
-    return result_list
-
-def framewise_mapper(labels_list):
-    """
-    Ставит метку границы там, где меняется символ, для остальных меток--'не-граница'
-    :param labels_list:
-    :return:
-    """
-    result_list=[]
-    labels_count=len(labels_list)
-
-    if labels_count>0:
-        first_label=make_label(constants.CONNECTION_LABEL,labels_list[0][constants.INDEX_KEY])
-        result_list.append(first_label)
-        for i in np.arange(1,labels_count):
-            current_label = labels_list[i]
-            prev_label=labels_list[i-1]
-            if prev_label[constants.CHAR_KEY]==current_label[constants.CHAR_KEY] and i!=labels_count-1:#Если не граница
-                new_label=make_label(constants.NOISE_LABEL,prev_label[constants.INDEX_KEY])
-            else:
-                new_label=make_label(constants.CONNECTION_LABEL,prev_label[constants.INDEX_KEY])
-            result_list.append(new_label)
-    return result_list
 
 def get_alphabet(train_config):
 
@@ -154,9 +117,10 @@ def get_labels_mapper(train_config):
         if train_config==TrainConfig.CONNECTIONS:
             return connections_only_mapper
         else:
-            return None
+            if train_config==TrainConfig.FRAGMENTS:
+                return fragments_mapper
 
 def get_labels_converter(train_config):
     if train_config==TrainConfig.FRAGMENTS:
-        return lc.BinLabelsConverter()
+        return lc.BinLabelsConverter(7)
     return None

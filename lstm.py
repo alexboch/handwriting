@@ -74,7 +74,7 @@ class LSTMDecoder:
 
 
     def train(self, words, num_epochs=100, output_training=False, model_name="model",
-              model_dir_path=f"Models{os.sep}model",validate=True,keep_prob=0.5,model_load_path=None,batch_size=20):
+              model_dir_path=f"Models{os.sep}model",validate=True,keep_prob=0.5,model_load_path=None,batch_size=5):
         """
         :param words: Список слов, содержащих точки и метки
         """
@@ -83,7 +83,8 @@ class LSTMDecoder:
         writer = tf.summary.FileWriter(os.path.join(model_dir_path, LOG_DIR))
         print("starting training,epochs:",num_epochs,"learning rate:",self.learning_rate)
         last_epoch_num=0
-        session = tf.Session()
+        gpu_options = tf.GPUOptions(allow_growth=True)
+        session = tf.Session(config=tf.ConfigProto(gpu_options=gpu_options))
         epoch_errors = []
         merged=tf.summary.merge_all()
         if model_load_path is not None:#Если задан путь, то загрузить и дотренировать
@@ -117,6 +118,7 @@ class LSTMDecoder:
         for word in words:
             word.length=len(word.point_list)
             word.weights=[]
+        words=list(filter(lambda w:w.length>0,words))#TODO:Убрать и перенести фильтрацию в скрипт подготовки данных
         weighted_words=list(words)
 
 
@@ -374,7 +376,7 @@ class LSTMDecoder:
                 cell_bw = self.lstm_cell()
                 cells_fw.append(cell_fw)
                 cells_bw.append(cell_bw)
-            self.rnn_outputs, self.rnn_state_fw,self.rnn_state_bw=tf.contrib.rnn.stack_bidirectional_dynamic_rnn(cells_fw=cells_fw, cells_bw=cells_bw, inputs=self.inputs,
+            self.rnn_outputs, _,_=tf.contrib.rnn.stack_bidirectional_dynamic_rnn(cells_fw=cells_fw, cells_bw=cells_bw, inputs=self.inputs,
                                                                                                                  sequence_length=self.seq_len,
                                                                   dtype=tf.float32)
             #rnn_outputs[batch_size,max_time,layers_output]
