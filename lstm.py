@@ -10,8 +10,8 @@ from graph_helper import GraphHelper
 map_fn = tf.map_fn
 
 class Loss(Enum):
-    Sequence=1
-    CrossEntropy=2
+    Sequence='Sequence'
+    CrossEntropy='CrossEntropy'
 
 class LSTMDecoder:
     """
@@ -123,7 +123,7 @@ class LSTMDecoder:
 
 
 
-        if self.loss==Loss.Sequence:
+        if self.loss_kind==Loss.Sequence:
             for word in weighted_words:
                 labels_arr=np.asarray(word.labels_list)
                 num_for_classes=np.zeros(self.num_outputs)
@@ -199,8 +199,20 @@ class LSTMDecoder:
                     feed_dict={self.inputs: inputs_arr, self.targets: targets_array,
                                self.seq_len: seq_lengths,self.keep_prob:keep_prob,self.multiples:multiples
                                                                                       }
-                    if self.loss==Loss.Sequence:
-                        feed_dict[self.entropy_weights]=[batch_word.weights for batch_word in batch_words]
+                    if self.loss_kind==Loss.Sequence:
+                        weights=np.zeros((real_batch_size,max_len))
+                        for k in range(real_batch_size):
+                            wl=seq_lengths[k]
+                            w=batch_words[k]
+                            weights[k][:wl]=w.weights
+                        feed_dict[self.entropy_weights]=weights
+                        #feed_dict[self.entropy_weights]=[batch_word.weights for batch_word in batch_words][0]
+
+                    print("input shapes:")
+                    for key,value in feed_dict.items():
+                        if hasattr(value,'shape'):
+                            print(f"Placeholder {key.name},shape:{tf.shape(key)} Value Shape:{value.shape}")
+
                     step,summary,loss,probs,_ = session.run([self.global_step,merged,self.loss,self.probs,self.train_fn],
                                                                            feed_dict=feed_dict)
                     train_epoch_loss+=loss
@@ -223,7 +235,7 @@ class LSTMDecoder:
                          self.targets:val_targets_arr,
                          self.seq_len:[val_word.length],
                          self.keep_prob:1.0,self.multiples:val_multiples}
-                        if self.loss==Loss.Sequence:
+                        if self.loss==Loss.Sequence.value:
                             val_feeds[self.entropy_weights]=val_word.weights,
                         validation_loss=session.run(self.loss, feed_dict=val_feeds)
                         print(f"loss{validation_loss} word:{val_word.text}")
@@ -405,7 +417,8 @@ class LSTMDecoder:
             else:
                 self.xent=tf.nn.sigmoid_cross_entropy_with_logits(labels=self.targets, logits=self.logits)
                 self.loss=tf.reduce_mean(self.xent)
-            tf.summary.histogram('xent',self.xent)
+            if self.loss_kind is not Loss.Sequence:
+                tf.summary.histogram('xent',self.xent)
             tf.summary.scalar('loss',self.loss)
         with tf.name_scope("train"):
             self.train_fn = tf.train.MomentumOptimizer(self.learning_rate,

@@ -4,7 +4,7 @@ from configurator import TrainConfig
 from prepare_data import *
 import argparse
 import json
-from lstm import LSTMDecoder
+from lstm import LSTMDecoder, Loss
 
 utils.enable_kb_interrupt()#Включаем прерывание по Ctrl+C
 if __name__=='__main__':
@@ -69,7 +69,7 @@ if __name__=='__main__':
         #Если задан в командной строке, то задать оттуда
         lstm:LSTMDecoder=LSTMDecoder(num_units=num_units,num_layers=num_layers,
                                      num_features=num_features,num_classes=num_classes,
-                                     learning_rate=learning_rate,loss=loss)
+                                     learning_rate=learning_rate,loss=Loss(loss))
         print("LSTM Network created")
         lstm.train(train_data,num_epochs=args.num_epochs,output_training=args.output_training,
                    model_dir_path=args.output_dir,validate=args.validate,model_load_path=args.load_path)
