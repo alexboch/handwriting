@@ -78,6 +78,9 @@ class LSTMDecoder:
         """
         :param words: Список слов, содержащих точки и метки
         """
+
+
+
         os.environ['FOR_DISABLE_CONSOLE_CTRL_HANDLER'] = '1'
         LOG_DIR = "Summary"
         writer = tf.summary.FileWriter(os.path.join(model_dir_path, LOG_DIR))
@@ -220,6 +223,7 @@ class LSTMDecoder:
                         for batch_word in batch_words:
                             print(f"Word loss:{loss}", "Epoch:", epoch_num,"Word number:",j,f"Word:{batch_word.text}")
                         writer.add_summary(summary,step)
+                        print('{"metric":"batch_loss","value":loss}')
                 """Конец эпохи(Прошли весь тренировочный датасет)"""
                 #Валидация
                 if validate:
@@ -235,10 +239,13 @@ class LSTMDecoder:
                          self.targets:val_targets_arr,
                          self.seq_len:[val_word.length],
                          self.keep_prob:1.0,self.multiples:val_multiples}
-                        if self.loss==Loss.Sequence.value:
-                            val_feeds[self.entropy_weights]=val_word.weights,
+                        if self.loss_kind==Loss.Sequence:#Задать веса
+                            weights = np.zeros((1, val_word.length))
+                            weights[0][:]=val_word.weights
+                            val_feeds[self.entropy_weights] = weights
                         validation_loss=session.run(self.loss, feed_dict=val_feeds)
                         print(f"loss{validation_loss} word:{val_word.text}")
+                        print('{"metric":"validation_loss","value":validation_loss}')
                         validation_loss_sum+=validation_loss
                     val_feeds_len=len(validation_data)
                     validation_epoch_norm/=val_feeds_len

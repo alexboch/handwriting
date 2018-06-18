@@ -3,16 +3,26 @@ from __future__ import division
 from __future__ import print_function
 import imp
 import ctypes
-from six.moves.urllib.request import urlretrieve
+#from six.moves.urllib.request import urlretrieve
 from six.moves import xrange as range
 from PointsAndRectangles import *
 import os
 import sys
 import numpy as np
-from winreg import *
+_winreg_ok=True
+try:
+    from winreg import *
+except ImportError:
+    print("Error importing winreg!")
+    _winreg_ok=False
 from sklearn.preprocessing import normalize
 import _thread
-import win32api
+_win32_ok=True
+try:
+    import win32api
+except ImportError:
+    print("Error importing win32 api!")
+    _win32_ok=False
 import linecache
 import sys
 
@@ -43,7 +53,8 @@ def enable_kb_interrupt():
             return 1  # don't chain to the next handler
         return 0  # chain to the next handler
 
-    win32api.SetConsoleCtrlHandler(handler, 1)
+    if _win32_ok:
+        win32api.SetConsoleCtrlHandler(handler, 1)
 
 
 def normalized_frobenius(arr1,arr2):
@@ -110,6 +121,9 @@ def levenshtein(s1, s2):
 
 def getListSeparator():
     '''Retrieves the Windows list separator character from the registry'''
+    if not _winreg_ok:
+        return ','
+
     aReg = ConnectRegistry(None, HKEY_CURRENT_USER)
     aKey = OpenKey(aReg, r"Control Panel\International")
     val = QueryValueEx(aKey, "sList")[0]
@@ -167,22 +181,7 @@ def download_progress_hook(count, blockSize, totalSize):
         last_percent_reported = percent
 
 
-def maybe_download(filename, expected_bytes, force=False):
-    """Download a file if not present, and make sure it's the right size."""
-    if force or not os.path.exists(filename):
-        print('Attempting to download:', filename)
-        filename, _ = urlretrieve(url + filename, filename,
-                                  reporthook=download_progress_hook)
-        print('\nDownload Complete!')
-    statinfo = os.stat(filename)
 
-    if statinfo.st_size == expected_bytes:
-        print('Found and verified', filename)
-    else:
-        raise Exception(
-                        'Failed to verify ' + filename + \
-                        '. Can you get to it with a browser?')
-    return filename
 
 def sparse_tuple_from(sequences, dtype=np.int32):
     """Create a sparse representention of x.
