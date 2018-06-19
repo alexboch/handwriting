@@ -187,69 +187,27 @@ class LSTMDecoder:
             train_len=int(data_len*0.8)
             validation_data=weighted_words[train_len:]
         training_words = weighted_words[:train_len]
-
+        train_points_num=0
         try:
             for i in np.arange(num_epochs):
                 epoch_num=last_epoch_num+i
                 epoch_errors_data=dict()
-                #np.random.shuffle(words)#
                 np.random.shuffle(training_words)
                 train_epoch_loss = 0  # Средняя ошибка по всем батчам в данной эпохе
                 can_output=output_training and (i%output_period==0 or i==num_epochs-1)
                 #training_words = [training_words[0]]  # TODO Убрать
                 lt = len(training_words)
                 print(f"Words count:{lt}")
-
-                for j in np.arange(0, lt,batch_size):  # Цикл по всем тренировочным словам, берем по batch_size слов
-                    real_batch_size=batch_size if j+batch_size<lt else lt-j
-                    print(f"j:{j}")
-                    #max_index=j+batch_size if j+batch_size<len(training_words) else len(training_words)
-                    max_index=j+real_batch_size
-                    print(f"max_index:{max_index}")
-                    multiples = [real_batch_size, 1, 1]
-                    batch_words = training_words[j:max_index]  # слова для создания батча
-                    np.random.shuffle(batch_words)
-                    max_len = max([w.length for w in batch_words])
-                    batch_inputs = [batch_word.point_list for batch_word in batch_words]
-                    seq_lengths = [batch_word.length for batch_word in batch_words]  # Вектор длин каждой последовательности
-                    total_points_num+=sum(batch_word.length for batch_word in batch_words)
-                    inputs_arr=np.zeros((real_batch_size, max_len, self.num_features))
-                    if self.loss_kind==Loss.Sequence:
-                        targets_array=np.zeros((real_batch_size,max_len))
-                    else:
-                        targets_array=np.zeros((real_batch_size,max_len,self.num_outputs))
-                    for batch_num in range(real_batch_size):
-                        w=batch_words[batch_num]
-                        batch = batch_inputs[batch_num]
-                        l = seq_lengths[batch_num]
-                        inputs_arr[batch_num][:l] = batch
-                        targets_array[batch_num][:l]=w.labels_list
-                    #Подаем батч на вход и получаем результат
-                    feed_dict={self.inputs: inputs_arr, self.targets: targets_array,
-                               self.seq_len: seq_lengths,self.keep_prob:keep_prob,self.multiples:multiples
-                                                                                      }
-                    if self.loss_kind==Loss.Sequence:
-                        weights=np.zeros((real_batch_size,max_len))
-                        for k in range(real_batch_size):
-                            wl=seq_lengths[k]
-                            w=batch_words[k]
-                            weights[k][:wl]=w.weights
-                        feed_dict[self.entropy_weights]=weights
-                        #feed_dict[self.entropy_weights]=[batch_word.weights for batch_word in batch_words][0]
-
-                    print("input shapes:")
-                    for key,value in feed_dict.items():
-                        if hasattr(value,'shape'):
-                            print(f"Placeholder {key.name},shape:{tf.shape(key)} Value Shape:{value.shape}")
-
+                batch_num=0
+                for feed_dict,pt_num in self.get_batch_feed(training_words,batch_size,keep_prob):  # Цикл по всем тренировочным словам, берем по batch_size слов
+                    train_points_num+=pt_num
                     step,summary,loss,probs,_ = session.run([self.global_step,merged,self.loss,self.probs,self.train_fn],
                                                                            feed_dict=feed_dict)
                     train_epoch_loss+=loss
                     if can_output:
-                        for batch_word in batch_words:
-                            print(f"Word loss:{loss}", "Epoch:", epoch_num,"Word number:",j,f"Word:{batch_word.text}")
+                        print(f"Epoch:{epoch_num},batch number {batch_num} batch loss:{loss}")
                         writer.add_summary(summary,step)
-                        print('{"metric":"batch_loss","value":loss}')
+                    batch_num+=1
                 """Конец эпохи(Прошли весь тренировочный датасет)"""
                 #Валидация
                 if validate:
@@ -257,27 +215,18 @@ class LSTMDecoder:
                     validation_epoch_nn=0
                     validation_epoch_cost=0
                     validation_loss_sum=0
-                    val_multiples=[1,1,1]
-                    for val_word in validation_data:#Для каждого слова валидации
-                        val_inputs_arr = np.asarray([val_word.point_list])
-                        val_targets_arr=np.asarray([val_word.labels_list])
-                        val_feeds={self.inputs:val_inputs_arr,
-                         self.targets:val_targets_arr,
-                         self.seq_len:[val_word.length],
-                         self.keep_prob:1.0,self.multiples:val_multiples}
-                        if self.loss_kind==Loss.Sequence:#Задать веса
-                            weights = np.zeros((1, val_word.length))
-                            weights[0][:]=val_word.weights
-                            val_feeds[self.entropy_weights] = weights
-                        validation_loss=session.run(self.loss, feed_dict=val_feeds)
-                        print(f"loss{validation_loss} word:{val_word.text}")
-                        print('{"metric":"validation_loss","value":validation_loss}')
+
+                    #for val_word in validation_data:#Для каждого слова валидации
+                    for val_feeds,_ in self.get_batch_feed(validation_data,batch_size,keep_prob):
+                        step, summary,validation_loss=session.run([self.global_step,merged,self.loss], feed_dict=val_feeds)
+                        print(f"loss{validation_loss} ")
+
                         validation_loss_sum+=validation_loss
-                    val_feeds_len=len(validation_data)
-                    validation_epoch_norm/=val_feeds_len
-                    validation_epoch_cost/=val_feeds_len
-                    validation_epoch_nn/=val_feeds_len
-                    epoch_validation_loss=validation_loss_sum/val_feeds_len
+                    num_val_batches=len(validation_data)/batch_size
+                    validation_epoch_norm/=num_val_batches
+                    validation_epoch_cost/=num_val_batches
+                    validation_epoch_nn/=num_val_batches
+                    epoch_validation_loss=validation_loss_sum/num_val_batches
                     epoch_errors_data["Epoch"] = epoch_num
                     epoch_errors_data["Validation loss"]=epoch_validation_loss
                     epoch_errors_data["Validation norm"]=validation_epoch_norm
