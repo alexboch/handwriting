@@ -123,7 +123,9 @@ class LSTMDecoder:
 
         os.environ['FOR_DISABLE_CONSOLE_CTRL_HANDLER'] = '1'
         LOG_DIR = "Summary"
-        writer = tf.summary.FileWriter(os.path.join(model_dir_path, LOG_DIR))
+
+        train_writer = tf.summary.FileWriter(os.path.join(model_dir_path, LOG_DIR))
+        val_writer=tf.summary.FileWriter(os.path.join(model_dir_path,os.path.join(LOG_DIR,"validation")))
         print("starting training,epochs:",num_epochs,"learning rate:",self.learning_rate)
         last_epoch_num=0
         gpu_options = tf.GPUOptions(allow_growth=True)
@@ -155,8 +157,6 @@ class LSTMDecoder:
             word.weights=[]
         words=list(filter(lambda w:w.length>0,words))#TODO:Убрать и перенести фильтрацию в скрипт подготовки данных
         weighted_words=list(words)
-
-
 
         if self.loss_kind==Loss.Sequence:
             for word in weighted_words:
@@ -203,10 +203,11 @@ class LSTMDecoder:
                     train_points_num+=pt_num
                     step,summary,loss,probs,_ = session.run([self.global_step,merged,self.loss,self.probs,self.train_fn],
                                                                            feed_dict=feed_dict)
+                    train_writer.add_summary(summary, step)
                     train_epoch_loss+=loss
                     if can_output:
                         print(f"Epoch:{epoch_num},batch number {batch_num} batch loss:{loss}")
-                        writer.add_summary(summary,step)
+
                     batch_num+=1
                 """Конец эпохи(Прошли весь тренировочный датасет)"""
                 #Валидация
@@ -220,7 +221,7 @@ class LSTMDecoder:
                     for val_feeds,_ in self.get_batch_feed(validation_data,batch_size,keep_prob):
                         step, summary,validation_loss=session.run([self.global_step,merged,self.loss], feed_dict=val_feeds)
                         print(f"loss{validation_loss} ")
-
+                        val_writer.add_summary(summary,step)
                         validation_loss_sum+=validation_loss
                     num_val_batches=len(validation_data)/batch_size
                     validation_epoch_norm/=num_val_batches
@@ -300,9 +301,9 @@ class LSTMDecoder:
             print("Graph freezing finished")
 
 
-            writer.add_graph(session.graph)
-            writer.flush()
-            writer.close()
+            train_writer.add_graph(session.graph)
+            train_writer.flush()
+            train_writer.close()
             print("Training result saved")
             session.close()
         return epoch_errors
