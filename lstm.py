@@ -80,7 +80,6 @@ class LSTMDecoder:
         """
 
 
-
         os.environ['FOR_DISABLE_CONSOLE_CTRL_HANDLER'] = '1'
         LOG_DIR = "Summary"
         writer = tf.summary.FileWriter(os.path.join(model_dir_path, LOG_DIR))
@@ -91,8 +90,9 @@ class LSTMDecoder:
         epoch_errors = []
         merged=tf.summary.merge_all()
         if model_load_path is not None:#Если задан путь, то загрузить и дотренировать
-            print("Loading model...")
-            load_dir=os.path.dirname(model_load_path)
+            load_dir = os.path.dirname(model_load_path)
+            print(f"Loading model from{load_dir}")
+
             model_name=os.path.splitext(os.path.basename(model_load_path))[0]
             print(f"Model name:{model_name}")
             #new_graph=tf.Graph()
@@ -100,10 +100,13 @@ class LSTMDecoder:
             #    saver=tf.train.import_meta_graph(model_load_path)
             with tf.name_scope("restore_train"):
                 saver=tf.train.Saver()
-                saver.restore(session,tf.train.latest_checkpoint(load_dir))
+                print(f"Restoring checkpoint from {load_dir}")
+                latest_ckeckpoint_path=tf.train.latest_checkpoint(load_dir)
+                print(f"full path to the latest checkpoint:{latest_ckeckpoint_path}")
+                saver.restore(session,latest_ckeckpoint_path)
             csv_path=os.path.join(load_dir,f"{model_name}.csv")
             print(f"Csv epochs path:{csv_path}")
-            epochs_file=csv.DictReader(open(csv_path))
+            #epochs_file=csv.DictReader(open(csv_path))
             #epoch_errors=list(epochs_file)#В список словарей
             #for err in epoch_errors:
             #    print(err)
@@ -317,8 +320,8 @@ class LSTMDecoder:
                 for i in np.arange(len(epoch_errors)):
                     data=epoch_errors[i]
                     csvwriter.writerow(data)#Записать строку в csv
-            self._checkpoint_path=os.path.join(model_dir_path, model_name)#Путь к сохраненному графу
-            saver = tf.train.Saver()
+            self._checkpoint_path=os.path.join(model_dir_path, model_name+'.ckpt')#Путь к сохраненному графу
+            saver = tf.train.Saver(save_relative_paths=True)
             saver.save(session,self._checkpoint_path)
             print("Freezing graph...")
             GraphHelper.freeze_graph(model_dir_path,'probs')

@@ -24,7 +24,7 @@ if __name__=='__main__':
     parser.add_argument('--load_path','-p',type=str,required=False,default=None)#Путь для загрузки сохраненной ранее модели для тренировки
     parser.add_argument('--nc_file','-c',type=str,required=False,default=None)#Путь к файлу конфигурации нейронки
     parser.add_argument('--loss','-l',type=str,choices=['Sequence','CrossEntropy'],required=False,default=None)
-    parser.add_argument('--batch_size','-b',required=False,default=50)
+    parser.add_argument('--batch_size','-b',type=int,required=False,default=50)
     args = parser.parse_args()
     print(f"Arguments:{args}")
 
@@ -74,4 +74,5 @@ if __name__=='__main__':
         print("LSTM Network created")
         lstm.train(train_data,num_epochs=args.num_epochs,output_training=args.output_training,
                    model_dir_path=args.output_dir,validate=args.validate,model_load_path=args.load_path,batch_size=args.batch_size)
-    pass
+    else:
+        print("Error:you must provide input and output directories!")
