@@ -72,6 +72,47 @@ class LSTMDecoder:
     TINY = 1e-6  # to avoid NaNs in logs
 
 
+    def get_batch_feed(self,words:list,batch_size:int,keep_prob:float):
+        lt = len(words)
+        print(f"Words count:{lt}")
+        points_num=0
+        for j in np.arange(0, lt, batch_size):  # Цикл по всем тренировочным словам, берем по batch_size слов
+            real_batch_size = batch_size if j + batch_size < lt else lt - j
+            print(f"j:{j}")
+            # max_index=j+batch_size if j+batch_size<len(training_words) else len(training_words)
+            max_index = j + real_batch_size
+            print(f"max_index:{max_index}")
+            multiples = [real_batch_size, 1, 1]
+            batch_words = words[j:max_index]  # слова для создания батча
+            np.random.shuffle(batch_words)
+            max_len = max([w.length for w in batch_words])
+            batch_inputs = [batch_word.point_list for batch_word in batch_words]
+            seq_lengths = [batch_word.length for batch_word in batch_words]  # Вектор длин каждой последовательности
+            points_num += sum(batch_word.length for batch_word in batch_words)
+            inputs_arr = np.zeros((real_batch_size, max_len, self.num_features))
+            if self.loss_kind == Loss.Sequence:
+                targets_array = np.zeros((real_batch_size, max_len))
+            else:
+                targets_array = np.zeros((real_batch_size, max_len, self.num_outputs))
+            for batch_num in range(real_batch_size):
+                w = batch_words[batch_num]
+                batch = batch_inputs[batch_num]
+                l = seq_lengths[batch_num]
+                inputs_arr[batch_num][:l] = batch
+                targets_array[batch_num][:l] = w.labels_list
+            # Подаем батч на вход и получаем результат
+            feed_dict = {self.inputs: inputs_arr, self.targets: targets_array,
+                         self.seq_len: seq_lengths, self.keep_prob: keep_prob, self.multiples: multiples
+                         }
+            if self.loss_kind == Loss.Sequence:
+                weights = np.zeros((real_batch_size, max_len))
+                for k in range(real_batch_size):
+                    wl = seq_lengths[k]
+                    w = batch_words[k]
+                    weights[k][:wl] = w.weights
+                feed_dict[self.entropy_weights] = weights
+            yield feed_dict,points_num#Вернуть словарь для передачи в модель и кол-во точек в батче
+                # feed_dict[self.entropy_weights]=[batch_word.weights for batch_word in batch_words][0]
 
     def train(self, words, num_epochs=100, output_training=False, model_name="model",
               model_dir_path=f"Models{os.sep}model",validate=True,keep_prob=0.5,model_load_path=None,batch_size=5):
@@ -92,25 +133,14 @@ class LSTMDecoder:
         if model_load_path is not None:#Если задан путь, то загрузить и дотренировать
             load_dir = os.path.dirname(model_load_path)
             print(f"Loading model from{load_dir}")
-
             model_name=os.path.splitext(os.path.basename(model_load_path))[0]
             print(f"Model name:{model_name}")
-            #new_graph=tf.Graph()
-            #with tf.Session(graph=new_graph) as sess:
-            #    saver=tf.train.import_meta_graph(model_load_path)
             with tf.name_scope("restore_train"):
                 saver=tf.train.Saver()
                 print(f"Restoring checkpoint from {load_dir}")
                 latest_ckeckpoint_path=tf.train.latest_checkpoint(load_dir)
                 print(f"full path to the latest checkpoint:{latest_ckeckpoint_path}")
                 saver.restore(session,latest_ckeckpoint_path)
-            csv_path=os.path.join(load_dir,f"{model_name}.csv")
-            print(f"Csv epochs path:{csv_path}")
-            #epochs_file=csv.DictReader(open(csv_path))
-            #epoch_errors=list(epochs_file)#В список словарей
-            #for err in epoch_errors:
-            #    print(err)
-            #last_epoch_num=epoch_errors[-1]["Epoch"]#TODO:Исправить загрузку словаря
         else:
             session.run(tf.global_variables_initializer())
         num_batches = len(words) / self.batch_size
@@ -118,7 +148,6 @@ class LSTMDecoder:
         total_points_num=0#Общее кол-во точек во всех образцах
         output_period=max(num_epochs/100.0*2,1)#Выводить каждый раз, когда прошло 2% обучения
         #output_period=1
-
         start_time=time.time()
         start_datetime=datetime.datetime.now()
         for word in words:
@@ -150,8 +179,6 @@ class LSTMDecoder:
 
         data_len=len(weighted_words)
         train_len=data_len#Если нет валидации, берем весь массив слов
-        #tf.data.Dataset.from_tensors()
-        valid_len=0
         validate=validate and data_len>1#Если слово только 1, то валидацию следать не сможем
         if data_len<=1:
             print("Dataset is too small to partition to train and validation sets!")
@@ -173,7 +200,7 @@ class LSTMDecoder:
                 lt = len(training_words)
                 print(f"Words count:{lt}")
 
-                for j in np.arange(0, lt,batch_size):  # Цикл по всем тренировочным словам, берем по 1 слову
+                for j in np.arange(0, lt,batch_size):  # Цикл по всем тренировочным словам, берем по batch_size слов
                     real_batch_size=batch_size if j+batch_size<lt else lt-j
                     print(f"j:{j}")
                     #max_index=j+batch_size if j+batch_size<len(training_words) else len(training_words)
@@ -184,13 +211,9 @@ class LSTMDecoder:
                     np.random.shuffle(batch_words)
                     max_len = max([w.length for w in batch_words])
                     batch_inputs = [batch_word.point_list for batch_word in batch_words]
-                    batch_labels = [batch_word.labels_list for batch_word in batch_words]
                     seq_lengths = [batch_word.length for batch_word in batch_words]  # Вектор длин каждой последовательности
                     total_points_num+=sum(batch_word.length for batch_word in batch_words)
                     inputs_arr=np.zeros((real_batch_size, max_len, self.num_features))
-                    #if self.loss_kind==Loss.Sequence:
-                    #targets_array=np.zeros()
-                    #inputs_arr = np.asarray([np.asarray(batch_input) for batch_input in batch_inputs])
                     if self.loss_kind==Loss.Sequence:
                         targets_array=np.zeros((real_batch_size,max_len))
                     else:
