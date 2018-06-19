@@ -116,8 +116,8 @@ class LSTMDecoder:
         num_batches = len(words) / self.batch_size
         num_words = len(words)
         total_points_num=0#Общее кол-во точек во всех образцах
-        #output_period=max(num_epochs/100.0*2,1)#Выводить каждый раз, когда прошло 2% обучения
-        output_period=1
+        output_period=max(num_epochs/100.0*2,1)#Выводить каждый раз, когда прошло 2% обучения
+        #output_period=1
 
         start_time=time.time()
         start_datetime=datetime.datetime.now()
