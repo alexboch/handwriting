@@ -74,14 +74,10 @@ class LSTMDecoder:
 
     def get_batch_feed(self,words:list,batch_size:int,keep_prob:float):
         lt = len(words)
-        print(f"Words count:{lt}")
         points_num=0
         for j in np.arange(0, lt, batch_size):  # Цикл по всем тренировочным словам, берем по batch_size слов
             real_batch_size = batch_size if j + batch_size < lt else lt - j
-            print(f"j:{j}")
-            # max_index=j+batch_size if j+batch_size<len(training_words) else len(training_words)
             max_index = j + real_batch_size
-            print(f"max_index:{max_index}")
             multiples = [real_batch_size, 1, 1]
             batch_words = words[j:max_index]  # слова для создания батча
             np.random.shuffle(batch_words)
@@ -197,7 +193,7 @@ class LSTMDecoder:
                 can_output=output_training and (i%output_period==0 or i==num_epochs-1)
                 #training_words = [training_words[0]]  # TODO Убрать
                 lt = len(training_words)
-                print(f"Words count:{lt}")
+
                 batch_num=0
                 for feed_dict,pt_num in self.get_batch_feed(training_words,batch_size,keep_prob):  # Цикл по всем тренировочным словам, берем по batch_size слов
                     train_points_num+=pt_num
@@ -335,7 +331,7 @@ class LSTMDecoder:
         self.num_layers = num_layers
         self.learning_rate = learning_rate
         self.inputs = tf.placeholder(tf.float32, [None, None, num_features], name='inputs')#[batch_size,max_time,num_features]
-        self.keep_prob=tf.placeholder(tf.float32)#Вероятность, что выходной нейрон остается
+        self.keep_prob=tf.placeholder(tf.float32,name='keep_prob')#Вероятность, что выходной нейрон остается
         self.num_outputs = num_outputs
         self.num_features=num_features
         self.batch_size = batch_size
