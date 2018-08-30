@@ -1,2 +1,0 @@
-model_checkpoint_path: "small_test.ckpt"
-all_model_checkpoint_paths: "small_test.ckpt"

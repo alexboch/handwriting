@@ -1,8 +1,0 @@
-Training started at 17:57:38 on May 30, 2018
-Training finished at 21:31:30 on May 30, 2018
-Number of training samples:986
-Total number of points:1036960
---Neural net configuration--
-Number of layers:2
-Number of units:128
-Learning rate0.01
