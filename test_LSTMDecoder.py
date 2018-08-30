@@ -1,6 +1,6 @@
 from unittest import TestCase
 import prepare_data as prepdata
-from decoder_factories import *
+
 from datetime import *
 import constants
 

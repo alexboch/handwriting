@@ -1,7 +1,6 @@
 import tensorflow as tf
 import numpy as np
 import prepare_data as prepdata
-from decoder_factories import *
 import constants
 import lstm
 
